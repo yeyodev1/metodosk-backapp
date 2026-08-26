@@ -43,6 +43,14 @@ export interface AccessEmailInput {
   accessMonths: number;
   accessUntil: Date;
   authorizationCode?: string | null;
+  /** Contraseña recién generada. Solo va en el correo de la primera compra. */
+  password?: string | null;
+}
+
+/** Dónde entra la compradora. */
+function loginUrl(): string {
+  const base = (process.env.SITE_URL || "https://metodosk.ec").replace(/\/$/, "");
+  return `${base}/login`;
 }
 
 /**
@@ -101,6 +109,12 @@ function accessText(i: AccessEmailInput & { saludo: string; reto: string }): str
     `Acceso: ${i.accessMonths} meses, hasta el ${formatDate(i.accessUntil)}`,
     i.authorizationCode ? `Autorización: ${i.authorizationCode}` : "",
     "",
+    "TUS DATOS PARA ENTRAR",
+    `Entra aquí: ${loginUrl()}`,
+    `Usuario: ${i.to}`,
+    i.password ? `Contraseña: ${i.password}` : "Contraseña: la que ya creaste",
+    i.password ? "Cámbiala cuando entres." : "",
+    "",
     "En las próximas horas te escribimos por WhatsApp para darte la bienvenida",
     "y entregarte el plan de entrenamiento y nutrición.",
     "",
@@ -144,6 +158,30 @@ function accessHtml(i: AccessEmailInput & { saludo: string; reto: string }): str
                   ${fila("Acceso hasta", formatDate(i.accessUntil))}
                   ${i.authorizationCode ? fila("Autorización", i.authorizationCode) : ""}
                 </table>
+
+                <div style="margin:0 0 20px;padding:18px 20px;border-radius:12px;background:#f6f1ec;">
+                  <div style="color:#8a8078;font-size:12px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">Tus datos para entrar</div>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="padding:4px 0;color:#8a8078;font-size:13px;">Usuario</td>
+                      <td style="padding:4px 0;color:#191413;font-size:14px;text-align:right;font-weight:600;">${i.to}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:4px 0;color:#8a8078;font-size:13px;">Contraseña</td>
+                      <td style="padding:4px 0;color:#191413;font-size:14px;text-align:right;font-weight:600;font-family:ui-monospace,Menlo,monospace;">${
+                        i.password ?? "la que ya creaste"
+                      }</td>
+                    </tr>
+                  </table>
+                  <a href="${loginUrl()}" style="display:block;margin-top:14px;padding:13px 20px;border-radius:999px;background:#191413;color:#fffdfb;font-size:14px;font-weight:600;text-align:center;text-decoration:none;">
+                    Entrar a mi cuenta
+                  </a>
+                  ${
+                    i.password
+                      ? '<div style="margin-top:10px;color:#8a8078;font-size:12px;text-align:center;">Cámbiala cuando entres.</div>'
+                      : ""
+                  }
+                </div>
 
                 <p style="margin:0 0 8px;color:#5c534c;font-size:15px;line-height:1.6;">
                   En las próximas horas te escribimos por WhatsApp para darte la bienvenida y

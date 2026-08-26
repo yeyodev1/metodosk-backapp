@@ -5,6 +5,7 @@ import { Order } from "../models/Order";
 import { AppEnvironment, resolveEnvironment } from "../config/environments";
 import { ACCESS_MONTHS, isKnownAmount } from "../config/pricing";
 import { sendAccessEmail } from "../helpers/email.helper";
+import { ensureMember } from "./auth.service";
 
 /** Endpoint de confirmación de la Cajita de Pagos. */
 const CONFIRM_URL = "https://paymentbox.payphonetodoesposible.com/api/confirm";
@@ -154,6 +155,19 @@ export async function confirmTransaction(
   // El correo va después de guardar: si falla, la compra igual queda registrada.
   let emailSent = false;
   if (status === "approved" && accessUntil) {
+    // La cuenta se crea sola con la compra; la contraseña solo existe la
+    // primera vez, para poder enviarla.
+    const cuenta = email
+      ? await ensureMember({
+          email,
+          name: contact?.name ?? raw.optionalParameter4 ?? null,
+          phone: contact?.phone ?? raw.phoneNumber ?? null,
+          challenge: contact?.challenge ?? null,
+          accessUntil,
+          clientTransactionId: raw.clientTransactionId || clientTxId,
+        })
+      : { password: null, created: false };
+
     emailSent = await sendAccessEmail({
       to: email ?? "",
       name: contact?.name ?? raw.optionalParameter4 ?? null,
@@ -162,6 +176,7 @@ export async function confirmTransaction(
       accessMonths: ACCESS_MONTHS,
       accessUntil,
       authorizationCode: raw.authorizationCode ?? null,
+      password: cuenta.password,
     });
   }
 
