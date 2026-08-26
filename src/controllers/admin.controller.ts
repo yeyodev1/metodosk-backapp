@@ -1,5 +1,5 @@
 import { Response, NextFunction } from "express";
-import mongoose from "mongoose";
+import { dbConnect, isConnected } from "../config/mongo";
 import { AuthRequest } from "../types/AuthRequest";
 import { CustomError } from "../errors/customError.error";
 import { Order } from "../models/Order";
@@ -11,8 +11,11 @@ import { Order } from "../models/Order";
  */
 export async function listOrders(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (mongoose.connection.readyState !== 1) {
-      throw new CustomError("El servidor no tiene base de datos configurada", 503);
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError(
+        "No pudimos conectarnos en este momento. Intenta de nuevo en unos segundos.",
+        503,
+      );
     }
 
     const { status, search } = req.query as { status?: string; search?: string };

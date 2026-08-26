@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import { User, type UserRole } from "../models/User";
 import { Order } from "../models/Order";
 import { CustomError } from "../errors/customError.error";
+import { dbConnect, isConnected } from "../config/mongo";
 
 const TOKEN_TTL = "30d";
 
@@ -14,10 +15,21 @@ function jwtSecret(): string {
   return secret;
 }
 
-function requireDb(): void {
-  if (mongoose.connection.readyState !== 1) {
-    throw new CustomError("El servidor no tiene base de datos configurada", 503);
-  }
+/**
+ * Espera a que la base esté lista en vez de rechazar de una.
+ *
+ * En una instancia fría la petición puede llegar antes que la conexión, y
+ * fallar ahí le mostraba a la compradora un error que no significa nada para
+ * ella. Se reintenta una vez y, si de verdad no hay base, el mensaje habla de
+ * lo que ella puede hacer: volver a intentar.
+ */
+async function requireDb(): Promise<void> {
+  if (isConnected()) return;
+  if (await dbConnect()) return;
+  throw new CustomError(
+    "No pudimos conectarnos en este momento. Intenta de nuevo en unos segundos.",
+    503,
+  );
 }
 
 export interface SessionUser {
@@ -68,7 +80,7 @@ export async function login(
   email: string,
   password: string,
 ): Promise<{ token: string; user: SessionUser }> {
-  requireDb();
+  await requireDb();
   if (!email || !password) {
     throw new CustomError("Escribe tu correo y tu contraseña", 400);
   }
@@ -87,7 +99,7 @@ export async function login(
 }
 
 export async function findById(id: string): Promise<SessionUser> {
-  requireDb();
+  await requireDb();
   const user = await User.findById(id);
   if (!user) throw new CustomError("Cuenta no encontrada", 404);
   return sanitize(user);
@@ -100,7 +112,7 @@ export async function findById(id: string): Promise<SessionUser> {
 export async function checkEmail(
   email: string,
 ): Promise<{ hasPurchase: boolean; hasAccount: boolean; challenge: string | null }> {
-  requireDb();
+  await requireDb();
   const normalizado = email.toLowerCase().trim();
   if (!EMAIL.test(normalizado)) throw new CustomError("Revisa el correo", 400);
 
@@ -126,7 +138,7 @@ export async function register(
   email: string,
   password: string,
 ): Promise<{ token: string; user: SessionUser }> {
-  requireDb();
+  await requireDb();
 
   const normalizado = email.toLowerCase().trim();
   if (!EMAIL.test(normalizado)) throw new CustomError("Revisa el correo", 400);
@@ -173,7 +185,7 @@ export async function changePassword(
   current: string,
   next: string,
 ): Promise<SessionUser> {
-  requireDb();
+  await requireDb();
   if (!next || next.length < MIN_PASSWORD) {
     throw new CustomError(`La contraseña debe tener al menos ${MIN_PASSWORD} caracteres`, 400);
   }
