@@ -67,7 +67,7 @@ export async function sendAccessEmail(input: AccessEmailInput): Promise<boolean>
   const reto = input.challenge || "el reto";
 
   try {
-    const { error } = await resend.emails.send({
+    const { data, error } = await resend.emails.send({
       from: sender(),
       to: input.to,
       subject: `Tu acceso a ${reto} — Método SK`,
@@ -79,6 +79,10 @@ export async function sendAccessEmail(input: AccessEmailInput): Promise<boolean>
       console.error("[email] Resend rechazó el envío:", error);
       return false;
     }
+
+    // Dejar rastro del envío: sin esto no hay forma de auditar después si el
+    // correo de una compra salió o no.
+    console.log(`[email] acceso enviado a ${input.to} · resend_id=${data?.id ?? "?"}`);
     return true;
   } catch (error) {
     console.error("[email] no se pudo enviar la confirmación:", error);
