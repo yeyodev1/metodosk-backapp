@@ -15,6 +15,13 @@ const LOCAL_ORIGINS = [
   "http://localhost:5174",
   "http://127.0.0.1:5173",
   "http://localhost:8100",
+  "http://localhost:8101",
+];
+
+/** Hostnames fijos del túnel cloudflared de desarrollo. */
+const TUNNEL_ORIGINS = [
+  "https://dev-project-front.bakano.ec",
+  "https://dev-project-back.bakano.ec",
 ];
 
 const PROD_ORIGINS = ["https://metodosk.ec", "https://www.metodosk.ec"];
@@ -41,7 +48,7 @@ function extraOrigins(): string[] {
 }
 
 export function isOriginAllowed(origin: string): boolean {
-  const list = [...LOCAL_ORIGINS, ...PROD_ORIGINS, ...extraOrigins()];
+  const list = [...LOCAL_ORIGINS, ...TUNNEL_ORIGINS, ...PROD_ORIGINS, ...extraOrigins()];
   if (list.includes(origin)) return true;
   return ALLOWED_PATTERNS.some((p) => p.test(origin));
 }
