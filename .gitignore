@@ -7,3 +7,7 @@ dist
 .env
 .env.*
 !.env.example
+
+# Este proyecto usa npm; un lock de pnpm hace que Vercel cambie de gestor.
+pnpm-lock.yaml
+pnpm-workspace.yaml
