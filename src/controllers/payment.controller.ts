@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { CustomError } from "../errors/customError.error";
-import { confirmTransaction } from "../services/payphone.service";
+import { confirmTransaction, resendAccess } from "../services/payphone.service";
 import { pricingStatus } from "../config/pricing";
 
 /**
@@ -25,6 +25,31 @@ export async function confirm(req: Request, res: Response, next: NextFunction) {
       String(clientTxId),
       requestOrigin(req),
       contact,
+    );
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * POST /api/payments/resend — body: { id, clientTxId, email? }
+ *
+ * Reenvía la confirmación de compra. Sin `email` va a la dirección del pago;
+ * con `email` va a la que indique la compradora.
+ */
+export async function resend(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id, clientTxId, email } = req.body ?? {};
+    if (!id || !clientTxId) {
+      throw new CustomError("Faltan id y clientTxId", 400);
+    }
+
+    const result = await resendAccess(
+      String(id),
+      String(clientTxId),
+      requestOrigin(req),
+      typeof email === "string" ? email : undefined,
     );
     res.status(200).json(result);
   } catch (error) {
