@@ -25,6 +25,13 @@ export interface PayphoneConfirmation {
   authorizationCode?: string;
   amount: number;
   message?: string;
+  /** Datos del acceso, para que la página de resultado los muestre. */
+  challenge?: string | null;
+  accessMonths?: number;
+  accessUntil?: string | null;
+  /** Correo al que se envió la confirmación. */
+  email?: string | null;
+  emailSent?: boolean;
 }
 
 interface PayphoneRaw {
@@ -145,8 +152,9 @@ export async function confirmTransaction(
   });
 
   // El correo va después de guardar: si falla, la compra igual queda registrada.
+  let emailSent = false;
   if (status === "approved" && accessUntil) {
-    await sendAccessEmail({
+    emailSent = await sendAccessEmail({
       to: email ?? "",
       name: contact?.name ?? raw.optionalParameter4 ?? null,
       challenge: contact?.challenge ?? null,
@@ -165,7 +173,109 @@ export async function confirmTransaction(
     authorizationCode: raw.authorizationCode,
     amount: amountCents,
     message: raw.message,
+    challenge: contact?.challenge ?? null,
+    accessMonths: ACCESS_MONTHS,
+    accessUntil: accessUntil ? accessUntil.toISOString() : null,
+    email,
+    emailSent,
   };
+}
+
+/**
+ * Vuelve a enviar la confirmación de compra, opcionalmente a otra dirección.
+ *
+ * Se reconfirma contra PayPhone en vez de confiar en lo que llegue del
+ * cliente: sin eso, cualquiera podría pedir el reenvío de una compra que no
+ * existe o que no fue aprobada.
+ */
+export async function resendAccess(
+  id: string,
+  clientTxId: string,
+  origin?: string,
+  toEmail?: string,
+): Promise<{ sent: boolean; email: string | null; accessUntil: string | null }> {
+  if (!canResend(clientTxId)) {
+    throw new CustomError(
+      "Demasiados reenvíos para esta compra. Espera unos minutos.",
+      429,
+    );
+  }
+
+  const environment = resolveEnvironment(origin);
+  const { token } = credentialsFor(environment);
+
+  let raw: PayphoneRaw;
+  try {
+    const response = await axios.post(
+      CONFIRM_URL,
+      { id: Number(id), clientTxId },
+      { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, timeout: 20000 },
+    );
+    raw = response.data as PayphoneRaw;
+  } catch (error) {
+    const axiosError = error as AxiosError<{ message?: string }>;
+    throw new CustomError(
+      axiosError.response?.data?.message || "No encontramos esa compra",
+      axiosError.response?.status || 502,
+    );
+  }
+
+  if (statusFrom(raw) !== "approved") {
+    throw new CustomError("Esa compra no está aprobada", 400);
+  }
+
+  const destino = toEmail?.trim() || raw.email || "";
+  if (!isEmail(destino)) {
+    throw new CustomError("Revisa el correo al que quieres reenviarlo", 400);
+  }
+
+  const stored = await findOrder(raw.clientTransactionId || clientTxId);
+  const accessUntil = stored?.accessUntil ?? addMonths(new Date(), ACCESS_MONTHS);
+
+  const sent = await sendAccessEmail({
+    to: destino,
+    name: stored?.buyerName ?? raw.optionalParameter4 ?? null,
+    challenge: stored?.challenge ?? null,
+    amountCents: Number(raw.amount) || 0,
+    accessMonths: ACCESS_MONTHS,
+    accessUntil,
+    authorizationCode: raw.authorizationCode ?? null,
+  });
+
+  return { sent, email: destino, accessUntil: accessUntil.toISOString() };
+}
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const isEmail = (value: string): boolean => EMAIL.test(value);
+
+/**
+ * Tope de reenvíos por compra. Es en memoria, así que en serverless aplica por
+ * instancia: suficiente para frenar un abuso torpe sin necesitar base de datos.
+ */
+const RESEND_LIMIT = 5;
+const RESEND_WINDOW_MS = 15 * 60 * 1000;
+const resendLog = new Map<string, number[]>();
+
+function canResend(clientTxId: string): boolean {
+  const now = Date.now();
+  const previos = (resendLog.get(clientTxId) ?? []).filter((t) => now - t < RESEND_WINDOW_MS);
+  if (previos.length >= RESEND_LIMIT) {
+    resendLog.set(clientTxId, previos);
+    return false;
+  }
+  previos.push(now);
+  resendLog.set(clientTxId, previos);
+  return true;
+}
+
+/** Datos guardados del pedido, si hay base de datos. */
+async function findOrder(clientTransactionId: string) {
+  if (mongoose.connection.readyState !== 1) return null;
+  try {
+    return await Order.findOne({ clientTransactionId }).lean();
+  } catch {
+    return null;
+  }
 }
 
 /** Guarda el pedido si hay base de datos. Nunca tumba la confirmación. */
