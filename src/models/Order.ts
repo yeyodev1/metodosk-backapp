@@ -19,6 +19,10 @@ export interface IOrder extends Document {
   email: string | null;
   phoneNumber: string | null;
   cardHolder: string | null;
+  /** Nombre que escribió la compradora en nuestro formulario. */
+  buyerName: string | null;
+  /** Reto elegido, p. ej. "SK Recomposición". */
+  challenge: string | null;
   accessMonths: number;
   accessUntil: Date | null;
   payphoneResponse: unknown;
@@ -43,6 +47,8 @@ const orderSchema = new Schema<IOrder>(
     email: { type: String, default: null },
     phoneNumber: { type: String, default: null },
     cardHolder: { type: String, default: null },
+    buyerName: { type: String, default: null },
+    challenge: { type: String, default: null },
     accessMonths: { type: Number, default: 3 },
     accessUntil: { type: Date, default: null },
     payphoneResponse: { type: Schema.Types.Mixed, default: null },

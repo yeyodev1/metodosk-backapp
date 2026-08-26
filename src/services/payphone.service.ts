@@ -4,9 +4,19 @@ import { CustomError } from "../errors/customError.error";
 import { Order } from "../models/Order";
 import { AppEnvironment, resolveEnvironment } from "../config/environments";
 import { ACCESS_MONTHS, isKnownAmount } from "../config/pricing";
+import { sendAccessEmail } from "../helpers/email.helper";
 
 /** Endpoint de confirmación de la Cajita de Pagos. */
 const CONFIRM_URL = "https://paymentbox.payphonetodoesposible.com/api/confirm";
+
+/** Datos que capturó nuestro formulario, para el correo y el registro. */
+export interface CheckoutContact {
+  name?: string;
+  email?: string;
+  phone?: string;
+  /** Nombre del reto elegido, p. ej. "SK Recomposición". */
+  challenge?: string;
+}
 
 /** Lo que devolvemos al frontend (ver metodosk-frontapp/src/services/paymentService.ts). */
 export interface PayphoneConfirmation {
@@ -69,6 +79,7 @@ export async function confirmTransaction(
   id: string,
   clientTxId: string,
   origin?: string,
+  contact?: CheckoutContact,
 ): Promise<PayphoneConfirmation> {
   if (!id || !clientTxId) {
     throw new CustomError("Faltan id y clientTxId", 400);
@@ -110,6 +121,10 @@ export async function confirmTransaction(
     );
   }
 
+  const accessUntil = status === "approved" ? addMonths(new Date(), ACCESS_MONTHS) : null;
+  // Preferimos el correo que escribió la compradora; el de PayPhone es el respaldo.
+  const email = contact?.email?.trim() || raw.email || null;
+
   await persistOrder({
     clientTransactionId: raw.clientTransactionId || clientTxId,
     payphoneTransactionId: raw.transactionId != null ? String(raw.transactionId) : null,
@@ -119,13 +134,28 @@ export async function confirmTransaction(
     currency: raw.currency || "USD",
     authorizationCode: raw.authorizationCode ?? null,
     environment,
-    email: raw.email ?? null,
-    phoneNumber: raw.phoneNumber ?? null,
+    email,
+    phoneNumber: contact?.phone ?? raw.phoneNumber ?? null,
     cardHolder: raw.optionalParameter4 ?? null,
+    buyerName: contact?.name ?? null,
+    challenge: contact?.challenge ?? null,
     accessMonths: ACCESS_MONTHS,
-    accessUntil: status === "approved" ? addMonths(new Date(), ACCESS_MONTHS) : null,
+    accessUntil,
     payphoneResponse: raw,
   });
+
+  // El correo va después de guardar: si falla, la compra igual queda registrada.
+  if (status === "approved" && accessUntil) {
+    await sendAccessEmail({
+      to: email ?? "",
+      name: contact?.name ?? raw.optionalParameter4 ?? null,
+      challenge: contact?.challenge ?? null,
+      amountCents,
+      accessMonths: ACCESS_MONTHS,
+      accessUntil,
+      authorizationCode: raw.authorizationCode ?? null,
+    });
+  }
 
   return {
     transactionStatus:

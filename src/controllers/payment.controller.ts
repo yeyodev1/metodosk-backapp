@@ -15,12 +15,17 @@ function requestOrigin(req: Request): string | undefined {
 /** POST /api/payments/confirm — body: { id, clientTxId } */
 export async function confirm(req: Request, res: Response, next: NextFunction) {
   try {
-    const { id, clientTxId } = req.body ?? {};
+    const { id, clientTxId, contact } = req.body ?? {};
     if (!id || !clientTxId) {
       throw new CustomError("Faltan id y clientTxId", 400);
     }
 
-    const result = await confirmTransaction(String(id), String(clientTxId), requestOrigin(req));
+    const result = await confirmTransaction(
+      String(id),
+      String(clientTxId),
+      requestOrigin(req),
+      contact,
+    );
     res.status(200).json(result);
   } catch (error) {
     next(error);
