@@ -38,6 +38,8 @@ export interface SessionUser {
   name: string;
   role: UserRole;
   challenge: string | null;
+  /** Todos los retos comprados. Puede tener los dos. */
+  challenges: string[];
   accessUntil: string | null;
   /** true si el acceso sigue vigente hoy. */
   accessActive: boolean;
@@ -52,6 +54,12 @@ function sanitize(user: InstanceType<typeof User>): SessionUser {
     name: user.name,
     role: user.role,
     challenge: user.challenge,
+    // Las cuentas creadas antes de que existiera la lista solo tienen el uno.
+    challenges: user.challenges?.length
+      ? user.challenges
+      : user.challenge
+        ? [user.challenge]
+        : [],
     accessUntil: accessUntil ? accessUntil.toISOString() : null,
     accessActive: Boolean(accessUntil && accessUntil > new Date()),
     mustChangePassword: user.mustChangePassword,
@@ -172,6 +180,9 @@ export async function register(
   user.name = user.name || orden.buyerName || "";
   user.phone = user.phone ?? orden.phoneNumber ?? null;
   user.challenge = orden.challenge ?? user.challenge;
+  if (orden.challenge && !user.challenges.includes(orden.challenge)) {
+    user.challenges.push(orden.challenge);
+  }
   user.accessUntil = orden.accessUntil ?? user.accessUntil;
   user.clientTransactionId = orden.clientTransactionId;
   await user.save();
@@ -241,6 +252,12 @@ export async function ensureMember(input: {
     user.name = input.name?.trim() || user.name;
     user.phone = input.phone ?? user.phone;
     user.challenge = input.challenge ?? user.challenge;
+
+    // Se suma, no se reemplaza: quien compra el segundo reto conserva el
+    // primero. Antes, comprar Volumen le quitaba Recomposición de la vista.
+    if (input.challenge && !user.challenges.includes(input.challenge)) {
+      user.challenges.push(input.challenge);
+    }
     // Si vuelve a comprar, se conserva la fecha más lejana.
     if (!user.accessUntil || input.accessUntil > user.accessUntil) {
       user.accessUntil = input.accessUntil;

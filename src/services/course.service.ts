@@ -98,6 +98,20 @@ function audienciaDe(challenge: string | null | undefined): Audiencia | null {
   return null;
 }
 
+/**
+ * Todo lo que ha comprado, no solo lo último.
+ *
+ * Quien compró los dos retos tiene que ver el material de los dos. Filtrar por
+ * `challenge` a secas le escondía el primero en cuanto compraba el segundo.
+ */
+function audienciasDe(user: { challenge: string | null; challenges?: string[] }): Audiencia[] {
+  const todos = user.challenges?.length ? user.challenges : [user.challenge];
+  const audiencias = todos
+    .map(audienciaDe)
+    .filter((a): a is Audiencia => a !== null);
+  return [...new Set(audiencias)];
+}
+
 export interface CursoParaAlumna {
   id: string;
   title: string;
@@ -106,6 +120,8 @@ export interface CursoParaAlumna {
   order: number;
   unlockMonth: number;
   coverPhoto: string | null;
+  /** A qué reto pertenece, para poder agruparlos si compró los dos. */
+  challenge: Audiencia;
   /** 'abierto' | 'proximamente' | 'cerrado-por-mes' */
   estado: "abierto" | "proximamente" | "cerrado";
   welcomeVideo: { embedUrl: string; thumbnail: string | null; completed: boolean } | null;
@@ -138,9 +154,9 @@ export async function listarParaAlumna(
   const user = await User.findById(userId);
   if (!user) throw new CustomError("Cuenta no encontrada", 404);
 
-  const audiencia = audienciaDe(user.challenge);
+  const audiencias = audienciasDe(user);
   const query: Record<string, unknown> = { status: { $in: ["publicado", "proximamente"] } };
-  if (audiencia) query.challenge = { $in: [audiencia, "ambas"] };
+  if (audiencias.length) query.challenge = { $in: [...audiencias, "ambas"] };
 
   const cursos = await Course.find(query).sort({ order: 1 }).lean();
   const hayBunny = Boolean(bunnyConfig());
@@ -165,6 +181,7 @@ export async function listarParaAlumna(
       order: curso.order,
       unlockMonth: curso.unlockMonth,
       coverPhoto: curso.coverPhoto,
+      challenge: curso.challenge,
       estado,
       welcomeVideo:
         abierto && curso.welcomeVideo?.bunnyId && hayBunny

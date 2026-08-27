@@ -15,8 +15,16 @@ export interface IUser extends Document {
   name: string;
   phone: string | null;
   role: UserRole;
-  /** Reto comprado, p. ej. "SK Volumen". */
+  /** El último reto comprado, p. ej. "SK Volumen". */
   challenge: string | null;
+  /**
+   * Todos los retos que ha comprado.
+   *
+   * Puede tener los dos: son planes distintos, no niveles de uno solo, y nada
+   * impide comprar el segundo después. `challenge` se conserva porque es el
+   * que se muestra como "tu reto" y porque ya había cuentas creadas con él.
+   */
+  challenges: string[];
   /** Hasta cuándo tiene acceso. null = sin acceso vigente. */
   accessUntil: Date | null;
   /** Referencia de la compra que originó la cuenta. */
@@ -43,6 +51,7 @@ const userSchema = new Schema<IUser>(
     phone: { type: String, default: null },
     role: { type: String, enum: ["admin", "member"], default: "member" },
     challenge: { type: String, default: null },
+    challenges: { type: [String], default: [] },
     accessUntil: { type: Date, default: null },
     clientTransactionId: { type: String, default: null },
     mustChangePassword: { type: Boolean, default: false },
