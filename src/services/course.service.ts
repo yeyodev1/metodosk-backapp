@@ -1,5 +1,6 @@
 import { Course, type Audiencia, type ICourse } from "../models/Course";
 import { User } from "../models/User";
+import { Progress } from "../models/Progress";
 import { CustomError } from "../errors/customError.error";
 import { dbConnect, isConnected } from "../config/mongo";
 import { bunnyConfig, crearSubida, estadoVideo, borrarVideo, urlEmbed } from "./bunny.service";
@@ -107,7 +108,7 @@ export interface CursoParaAlumna {
   coverPhoto: string | null;
   /** 'abierto' | 'proximamente' | 'cerrado-por-mes' */
   estado: "abierto" | "proximamente" | "cerrado";
-  welcomeVideo: { embedUrl: string; thumbnail: string | null } | null;
+  welcomeVideo: { embedUrl: string; thumbnail: string | null; completed: boolean } | null;
   lessons: Array<{
     id: string;
     title: string;
@@ -116,6 +117,9 @@ export interface CursoParaAlumna {
     embedUrl: string | null;
     fileUrl: string | null;
     durationSeconds: number | null;
+    /** Dónde se quedó y si ya la terminó. */
+    seconds: number;
+    completed: boolean;
   }>;
 }
 
@@ -141,6 +145,12 @@ export async function listarParaAlumna(
   const cursos = await Course.find(query).sort({ order: 1 }).lean();
   const hayBunny = Boolean(bunnyConfig());
 
+  // El avance se trae de una vez y no por curso: son doce cursos, no doce
+  // consultas.
+  const avance = await Progress.find({ user: userId }).lean();
+  const visto = (courseId: string, lessonId: string) =>
+    avance.find((a) => a.courseId === courseId && a.lessonId === lessonId);
+
   return cursos.map((curso) => {
     const cerradoPorMes = curso.unlockMonth > mesActual;
     const estado: CursoParaAlumna["estado"] =
@@ -159,8 +169,14 @@ export async function listarParaAlumna(
       welcomeVideo:
         abierto && curso.welcomeVideo?.bunnyId && hayBunny
           ? {
-              embedUrl: urlEmbed(curso.welcomeVideo.bunnyId),
+              // Retoma donde se quedó: en un video largo, buscar el punto a
+              // mano es la parte que hace que no se vuelva.
+              embedUrl: urlEmbed(
+                curso.welcomeVideo.bunnyId,
+                visto(String(curso._id), "welcome")?.seconds ?? 0,
+              ),
               thumbnail: curso.welcomeVideo.thumbnail,
+              completed: Boolean(visto(String(curso._id), "welcome")?.completed),
             }
           : null,
       // Los títulos de las clases se ven siempre: saber qué viene es parte de
@@ -168,15 +184,23 @@ export async function listarParaAlumna(
       lessons: (curso.lessons || [])
         .slice()
         .sort((a, b) => a.order - b.order)
-        .map((l: any) => ({
-          id: String(l._id),
-          title: l.title,
-          summary: l.summary,
-          order: l.order,
-          embedUrl: abierto && l.video?.bunnyId && hayBunny ? urlEmbed(l.video.bunnyId) : null,
-          fileUrl: abierto ? l.fileUrl : null,
-          durationSeconds: l.video?.durationSeconds ?? null,
-        })),
+        .map((l: any) => {
+          const suyo = visto(String(curso._id), String(l._id));
+          return {
+            id: String(l._id),
+            title: l.title,
+            summary: l.summary,
+            order: l.order,
+            embedUrl:
+              abierto && l.video?.bunnyId && hayBunny
+                ? urlEmbed(l.video.bunnyId, suyo?.seconds ?? 0)
+                : null,
+            fileUrl: abierto ? l.fileUrl : null,
+            durationSeconds: l.video?.durationSeconds ?? null,
+            seconds: suyo?.seconds ?? 0,
+            completed: Boolean(suyo?.completed),
+          };
+        }),
     };
   });
 }

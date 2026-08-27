@@ -4,6 +4,7 @@ import authRouter from "./auth.routes";
 import adminRouter from "./admin.routes";
 import courseRouter from "./course.routes";
 import settingsRouter from "./settings.routes";
+import progressRouter from "./progress.routes";
 
 function routerApi(app: Application) {
   const router = express.Router();
@@ -14,6 +15,7 @@ function routerApi(app: Application) {
   router.use("/admin", adminRouter);
   router.use("/courses", courseRouter);
   router.use("/settings", settingsRouter);
+  router.use("/progress", progressRouter);
 }
 
 export default routerApi;
