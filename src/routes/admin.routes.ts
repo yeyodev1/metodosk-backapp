@@ -3,6 +3,7 @@ import { authMiddleware } from "../middlewares/auth.middleware";
 import { adminMiddleware } from "../middlewares/admin.middleware";
 import * as adminController from "../controllers/admin.controller";
 import * as courseController from "../controllers/course.controller";
+import * as settingsController from "../controllers/settings.controller";
 
 const router = Router();
 
@@ -19,5 +20,11 @@ router.post("/courses/:id/video", courseController.prepararVideo);
 router.get("/courses/:id/video", courseController.refrescarVideo);
 router.post("/courses/:id/lessons", courseController.agregarClase);
 router.delete("/courses/:id/lessons/:lessonId", courseController.eliminarClase);
+
+// El video de bienvenida (VSL) que ve quien acaba de comprar.
+router.get("/vsl", settingsController.vslAdmin);
+router.post("/vsl/video", settingsController.prepararVsl);
+router.get("/vsl/estado", settingsController.refrescarVsl);
+router.delete("/vsl", settingsController.borrarVsl);
 
 export default router;
