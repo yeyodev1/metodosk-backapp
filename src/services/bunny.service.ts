@@ -162,8 +162,14 @@ export function urlReproduccion(videoId: string, horas = 6): string {
   return `${base}?token=${token}&expires=${expira}`;
 }
 
-/** El reproductor embebido de Bunny, para no montar un player propio. */
-export function urlEmbed(videoId: string): string {
+/**
+ * El reproductor embebido de Bunny, para no montar un player propio.
+ *
+ * `desde` retoma la reproducción en el segundo indicado — así una clase de 40
+ * minutos no obliga a buscar a mano dónde se quedó.
+ */
+export function urlEmbed(videoId: string, desde = 0): string {
   const config = requireBunny();
-  return `https://iframe.mediadelivery.net/embed/${config.libraryId}/${videoId}`;
+  const base = `https://player.mediadelivery.net/embed/${config.libraryId}/${videoId}`;
+  return desde > 5 ? `${base}?t=${Math.floor(desde)}s` : base;
 }
