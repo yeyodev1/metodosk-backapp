@@ -4,6 +4,7 @@ import { adminMiddleware } from "../middlewares/admin.middleware";
 import * as adminController from "../controllers/admin.controller";
 import * as courseController from "../controllers/course.controller";
 import * as settingsController from "../controllers/settings.controller";
+import * as commentController from "../controllers/comment.controller";
 
 const router = Router();
 
@@ -26,5 +27,10 @@ router.get("/vsl", settingsController.vslAdmin);
 router.post("/vsl/video", settingsController.prepararVsl);
 router.get("/vsl/estado", settingsController.refrescarVsl);
 router.delete("/vsl", settingsController.borrarVsl);
+
+// Moderación de comentarios.
+router.get("/comments", commentController.listarAdmin);
+router.put("/comments/:id/hidden", commentController.ocultar);
+router.delete("/comments/:id", commentController.eliminar);
 
 export default router;
