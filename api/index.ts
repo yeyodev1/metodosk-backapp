@@ -2,6 +2,7 @@ import "dotenv/config";
 import { dbConnect, isConnected } from "../src/config/mongo";
 import { createApp } from "../src/app";
 import { seedAdmin } from "../src/services/auth.service";
+import { seedCourses } from "../src/services/course.service";
 import type { Express } from "express";
 
 /**
@@ -22,6 +23,7 @@ async function ensureApp(): Promise<Express> {
     arranque = (async () => {
       await dbConnect();
       await seedAdmin();
+      await seedCourses();
       return createApp().app;
     })().catch((error) => {
       // No se cachea un arranque fallido: la siguiente petición reintenta.
@@ -35,7 +37,10 @@ async function ensureApp(): Promise<Express> {
   // La instancia sigue viva pero la conexión pudo caerse entre invocaciones.
   if (!isConnected()) {
     const reconectado = await dbConnect();
-    if (reconectado) await seedAdmin();
+    if (reconectado) {
+      await seedAdmin();
+      await seedCourses();
+    }
   }
 
   return app;
