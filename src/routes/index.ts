@@ -6,6 +6,7 @@ import courseRouter from "./course.routes";
 import settingsRouter from "./settings.routes";
 import progressRouter from "./progress.routes";
 import commentRouter from "./comment.routes";
+import onboardingRouter from "./onboarding.routes";
 
 function routerApi(app: Application) {
   const router = express.Router();
@@ -18,6 +19,7 @@ function routerApi(app: Application) {
   router.use("/settings", settingsRouter);
   router.use("/progress", progressRouter);
   router.use("/comments", commentRouter);
+  router.use("/onboarding", onboardingRouter);
 }
 
 export default routerApi;
