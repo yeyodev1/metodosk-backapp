@@ -7,6 +7,7 @@ import settingsRouter from "./settings.routes";
 import progressRouter from "./progress.routes";
 import commentRouter from "./comment.routes";
 import onboardingRouter from "./onboarding.routes";
+import communityRouter from "./community.routes";
 
 function routerApi(app: Application) {
   const router = express.Router();
@@ -20,6 +21,7 @@ function routerApi(app: Application) {
   router.use("/progress", progressRouter);
   router.use("/comments", commentRouter);
   router.use("/onboarding", onboardingRouter);
+  router.use("/comunidad", communityRouter);
 }
 
 export default routerApi;

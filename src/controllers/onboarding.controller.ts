@@ -67,3 +67,25 @@ export async function reabrir(req: AuthRequest, res: Response, next: NextFunctio
     next(error);
   }
 }
+
+/* ─────────────── Medidas ─────────────── */
+
+export async function guardarMedidas(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res
+      .status(200)
+      .json(await onboardingService.guardarMedidas(req.user!.userId, req.body ?? {}));
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function quitarMedidas(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const fecha = String(req.params.fecha || "");
+    if (!fecha) throw new CustomError("Falta la fecha", 400);
+    res.status(200).json(await onboardingService.quitarMedidas(req.user!.userId, fecha));
+  } catch (error) {
+    next(error);
+  }
+}

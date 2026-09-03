@@ -305,3 +305,60 @@ export async function seedAdmin(): Promise<void> {
     console.error("[auth] no se pudo crear la cuenta de administración:", error);
   }
 }
+
+/**
+ * Las cuentas de Scarlet y Karen.
+ *
+ * Van escritas acá y no en el entorno porque son parte del producto, no de la
+ * infraestructura: el reto es de ellas dos y sus cuentas tienen que existir en
+ * cualquier ambiente donde el sitio corra, sin depender de que alguien acuerde
+ * de definir seis variables más.
+ *
+ * Si la cuenta ya existe no se le toca la contraseña — solo se le asegura el
+ * rol. Reescribirla en cada arranque desharía cualquier cambio que hicieran
+ * ellas, y el deploy siguiente las dejaría fuera de su propia cuenta.
+ */
+const DUENAS: Array<{ email: string; name: string; password: string }> = [
+  {
+    email: "cordovaortiz@gmail.com",
+    name: "Scarlet Córdova",
+    password: "123456789",
+  },
+  {
+    email: "nutricionistakarenlopeza@gmail.com",
+    name: "Karen López",
+    password: "123456789",
+  },
+];
+
+export async function seedDuenas(): Promise<void> {
+  if (mongoose.connection.readyState !== 1) return;
+
+  for (const duena of DUENAS) {
+    const email = duena.email.toLowerCase().trim();
+    try {
+      const existente = await User.findOne({ email });
+
+      if (existente) {
+        // Puede haber comprado con este mismo correo antes de tener panel.
+        if (existente.role !== "admin") {
+          existente.role = "admin";
+          existente.name = existente.name || duena.name;
+          await existente.save();
+          console.log(`[auth] ${email} promovida a administración`);
+        }
+        continue;
+      }
+
+      await User.create({
+        email,
+        password: await bcrypt.hash(duena.password, 10),
+        name: duena.name,
+        role: "admin",
+      });
+      console.log(`[auth] cuenta de administración creada: ${email}`);
+    } catch (error) {
+      console.error(`[auth] no se pudo preparar la cuenta de ${email}:`, error);
+    }
+  }
+}

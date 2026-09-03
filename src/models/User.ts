@@ -54,6 +54,30 @@ export interface IUser extends Document {
     publicId: string;
     createdAt: Date;
   }>;
+  /**
+   * Sus medidas, una toma por fecha.
+   *
+   * Se guarda el histórico entero por la misma razón que las fotos: el número
+   * de hoy no dice nada solo, y la cintura baja cuando la balanza no se mueve.
+   * Todos los campos son opcionales — se apunta lo que se midió, no se exige
+   * una toma completa para poder guardar.
+   */
+  measurements: Array<{
+    pesoKg: number | null;
+    cinturaCm: number | null;
+    caderaCm: number | null;
+    pechoCm: number | null;
+    brazoCm: number | null;
+    piernaCm: number | null;
+    nota: string;
+    createdAt: Date;
+  }>;
+  /**
+   * Su foto de perfil de la comunidad. Pública, a diferencia de las de avance:
+   * es la que ella elige mostrarle al resto, y va en cada mensaje del muro.
+   * null = se pinta su inicial.
+   */
+  avatarPublicId: string | null;
   lastLoginAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -95,6 +119,23 @@ const userSchema = new Schema<IUser>(
       ],
       default: [],
     },
+    measurements: {
+      type: [
+        {
+          _id: false,
+          pesoKg: { type: Number, default: null },
+          cinturaCm: { type: Number, default: null },
+          caderaCm: { type: Number, default: null },
+          pechoCm: { type: Number, default: null },
+          brazoCm: { type: Number, default: null },
+          piernaCm: { type: Number, default: null },
+          nota: { type: String, default: "" },
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
+    avatarPublicId: { type: String, default: null },
     lastLoginAt: { type: Date, default: null },
   },
   { timestamps: true },

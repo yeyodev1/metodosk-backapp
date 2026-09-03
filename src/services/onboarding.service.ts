@@ -28,8 +28,35 @@ export type Angulo = (typeof ANGULOS)[number];
 /** Los que se piden en cada toma. */
 export const ANGULOS_PEDIDOS: Angulo[] = ["frente", "espalda"];
 
-/** Cada cuánto toca repetir las fotos. */
-export const DIAS_ENTRE_TOMAS = 14;
+/**
+ * Cada cuánto toca repetir las fotos.
+ *
+ * Una vez al mes. Quincenal daba un cambio tan chico entre toma y toma que la
+ * comparación desanimaba en vez de motivar: a los catorce días el espejo no se
+ * mueve, y lo que se ve es "no pasó nada". Al mes sí hay diferencia que mirar.
+ */
+export const DIAS_ENTRE_TOMAS = 30;
+
+/** Los campos de una toma de medidas. Todos opcionales: se apunta lo que se midió. */
+export interface Medida {
+  pesoKg: number | null;
+  cinturaCm: number | null;
+  caderaCm: number | null;
+  pechoCm: number | null;
+  brazoCm: number | null;
+  piernaCm: number | null;
+  nota: string;
+  createdAt: string;
+}
+
+/** Una foto de partida y la más reciente del mismo ángulo, para comparar. */
+export interface Comparativa {
+  angulo: Angulo;
+  antes: { url: string; createdAt: string };
+  despues: { url: string; createdAt: string };
+  /** Cuánto tiempo separa las dos. Es la mitad de lo que dice una comparación. */
+  diasEntre: number;
+}
 
 export interface EstadoOnboarding {
   videoSeen: boolean;
@@ -44,8 +71,19 @@ export interface EstadoOnboarding {
   ultimas: Partial<Record<Angulo, { url: string; createdAt: string }>>;
   /** Cuándo toca la siguiente toma. null si todavía no subió ninguna. */
   proximaToma: string | null;
-  /** true cuando ya pasaron las dos semanas. */
+  /**
+   * Cuántos días faltan para la siguiente. 0 = hoy le toca.
+   * null cuando todavía no hay ninguna foto de la que contar.
+   */
+  diasParaProxima: number | null;
+  /** true cuando ya pasó el mes. */
   tomaPendiente: boolean;
+  /** Cada cuántos días se repite la toma. Lo pinta la vista, no lo adivina. */
+  diasEntreTomas: number;
+  /** Antes y después por ángulo. Vacío mientras solo haya una toma. */
+  comparativa: Comparativa[];
+  /** Sus medidas, de la más reciente a la más antigua. */
+  medidas: Medida[];
   /** false si falta configurar Cloudinary: la vista lo dice en vez de fallar. */
   fotosDisponibles: boolean;
 }
@@ -80,6 +118,12 @@ function armarEstado(user: InstanceType<typeof User>): EstadoOnboarding {
     ? new Date(masReciente.getTime() + DIAS_ENTRE_TOMAS * 86_400_000)
     : null;
 
+  const ahora = new Date();
+  // Días enteros hacia arriba: faltando 20 horas se dice "1 día", no "0".
+  const diasParaProxima = proximaToma
+    ? Math.max(0, Math.ceil((proximaToma.getTime() - ahora.getTime()) / 86_400_000))
+    : null;
+
   return {
     videoSeen: onboarding.videoSeen,
     photosUploaded: onboarding.photosUploaded,
@@ -94,9 +138,69 @@ function armarEstado(user: InstanceType<typeof User>): EstadoOnboarding {
     })),
     ultimas,
     proximaToma: proximaToma ? proximaToma.toISOString() : null,
-    tomaPendiente: Boolean(proximaToma && proximaToma <= new Date()),
+    diasParaProxima,
+    tomaPendiente: Boolean(proximaToma && proximaToma <= ahora),
+    diasEntreTomas: DIAS_ENTRE_TOMAS,
+    comparativa: armarComparativa(fotos, hayCloudinary),
+    medidas: [...(user.measurements || [])]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map(mapaMedida),
     fotosDisponibles: hayCloudinary,
   };
+}
+
+function mapaMedida(m: InstanceType<typeof User>["measurements"][number]): Medida {
+  return {
+    pesoKg: m.pesoKg ?? null,
+    cinturaCm: m.cinturaCm ?? null,
+    caderaCm: m.caderaCm ?? null,
+    pechoCm: m.pechoCm ?? null,
+    brazoCm: m.brazoCm ?? null,
+    piernaCm: m.piernaCm ?? null,
+    nota: m.nota || "",
+    createdAt: m.createdAt.toISOString(),
+  };
+}
+
+/**
+ * El antes y el después de cada ángulo.
+ *
+ * "Antes" es la primera foto que subió, no la anterior: comparar contra la del
+ * mes pasado esconde justo lo que costó tres meses conseguir. Y solo aparece
+ * cuando hay dos tomas distintas del mismo ángulo — una foto contra sí misma
+ * no es una comparación, es un error de la pantalla.
+ */
+function armarComparativa(
+  fotos: InstanceType<typeof User>["progressPhotos"],
+  hayCloudinary: boolean,
+): Comparativa[] {
+  if (!hayCloudinary) return [];
+
+  const salida: Comparativa[] = [];
+
+  for (const angulo of ANGULOS) {
+    // `fotos` llega de la más reciente a la más antigua.
+    const delAngulo = fotos.filter((f) => f.angulo === angulo);
+    if (delAngulo.length < 2) continue;
+
+    const despues = delAngulo[0]!;
+    const antes = delAngulo[delAngulo.length - 1]!;
+
+    salida.push({
+      angulo,
+      antes: { url: urlFirmada(antes.publicId), createdAt: antes.createdAt.toISOString() },
+      despues: {
+        url: urlFirmada(despues.publicId),
+        createdAt: despues.createdAt.toISOString(),
+      },
+      diasEntre: Math.max(
+        0,
+        Math.round((despues.createdAt.getTime() - antes.createdAt.getTime()) / 86_400_000),
+      ),
+    });
+  }
+
+  return salida;
 }
 
 export async function estado(userId: string): Promise<EstadoOnboarding> {
@@ -220,6 +324,109 @@ export async function reabrir(userId: string): Promise<EstadoOnboarding> {
 
   user.onboarding.skipped = false;
   user.onboarding.completedAt = null;
+  await user.save();
+  return armarEstado(user);
+}
+
+
+/* ─────────────── Medidas ─────────────── */
+
+/** Rangos de cordura. No son un juicio: atajan el dedo que resbala en el teclado. */
+const LIMITES: Record<string, [number, number]> = {
+  pesoKg: [25, 300],
+  cinturaCm: [30, 250],
+  caderaCm: [30, 250],
+  pechoCm: [30, 250],
+  brazoCm: [10, 100],
+  piernaCm: [20, 150],
+};
+
+/**
+ * Un campo que ella dejó en blanco vale null, no cero.
+ *
+ * La diferencia importa: cero kilos en la gráfica dibuja un desplome que nunca
+ * pasó. Si no lo midió, no hay dato — y el histórico lo dibuja como hueco.
+ */
+function numeroOpcional(valor: unknown, campo: string): number | null {
+  if (valor === null || valor === undefined || valor === "") return null;
+
+  const n = Number(valor);
+  if (!Number.isFinite(n)) throw new CustomError(`Revisa el valor de ${campo}`, 400);
+
+  const [min, max] = LIMITES[campo]!;
+  if (n < min || n > max) {
+    throw new CustomError(`Ese valor de ${campo} no parece correcto`, 400);
+  }
+  // Un decimal: la cinta métrica no da para más y evita "72.4000000001".
+  return Math.round(n * 10) / 10;
+}
+
+export interface EntradaMedidas {
+  pesoKg?: unknown;
+  cinturaCm?: unknown;
+  caderaCm?: unknown;
+  pechoCm?: unknown;
+  brazoCm?: unknown;
+  piernaCm?: unknown;
+  nota?: unknown;
+}
+
+/**
+ * Guarda la toma de medidas de hoy.
+ *
+ * Como con las fotos, una segunda toma el mismo día reemplaza a la primera:
+ * eso no es un dato nuevo, es que se equivocó al escribirlo. El histórico de
+ * los días anteriores no se toca nunca.
+ */
+export async function guardarMedidas(
+  userId: string,
+  entrada: EntradaMedidas,
+): Promise<EstadoOnboarding> {
+  await requireDb();
+
+  const medida = {
+    pesoKg: numeroOpcional(entrada.pesoKg, "pesoKg"),
+    cinturaCm: numeroOpcional(entrada.cinturaCm, "cinturaCm"),
+    caderaCm: numeroOpcional(entrada.caderaCm, "caderaCm"),
+    pechoCm: numeroOpcional(entrada.pechoCm, "pechoCm"),
+    brazoCm: numeroOpcional(entrada.brazoCm, "brazoCm"),
+    piernaCm: numeroOpcional(entrada.piernaCm, "piernaCm"),
+    nota: String(entrada.nota ?? "").trim().slice(0, 300),
+    createdAt: new Date(),
+  };
+
+  const hayAlgo =
+    medida.pesoKg !== null ||
+    medida.cinturaCm !== null ||
+    medida.caderaCm !== null ||
+    medida.pechoCm !== null ||
+    medida.brazoCm !== null ||
+    medida.piernaCm !== null;
+  if (!hayAlgo) throw new CustomError("Escribe al menos una medida", 400);
+
+  const user = await User.findById(userId);
+  if (!user) throw new CustomError("Cuenta no encontrada", 404);
+
+  const hoy = medida.createdAt.toDateString();
+  user.measurements = user.measurements.filter((m) => m.createdAt.toDateString() !== hoy);
+  user.measurements.push(medida);
+
+  await user.save();
+  return armarEstado(user);
+}
+
+/** Quita la toma de una fecha. Se identifica por el día, que es como ella la ve. */
+export async function quitarMedidas(userId: string, fechaIso: string): Promise<EstadoOnboarding> {
+  await requireDb();
+  const user = await User.findById(userId);
+  if (!user) throw new CustomError("Cuenta no encontrada", 404);
+
+  const objetivo = new Date(fechaIso);
+  if (Number.isNaN(objetivo.getTime())) throw new CustomError("Fecha no válida", 400);
+
+  const dia = objetivo.toDateString();
+  user.measurements = user.measurements.filter((m) => m.createdAt.toDateString() !== dia);
+
   await user.save();
   return armarEstado(user);
 }

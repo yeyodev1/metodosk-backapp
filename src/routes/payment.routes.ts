@@ -8,5 +8,6 @@ router.post("/confirm", paymentController.confirm);
 router.post("/resend", paymentController.resend);
 router.get("/pricing", paymentController.pricing);
 router.get("/mine", authMiddleware, paymentController.misPagos);
+router.get("/beneficios", authMiddleware, paymentController.beneficios);
 
 export default router;

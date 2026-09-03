@@ -11,6 +11,8 @@ router.post("/video-visto", onboardingController.videoVisto);
 router.post("/foto/firma", onboardingController.firmarFoto);
 router.post("/foto", onboardingController.guardarFoto);
 router.delete("/foto/:angulo", onboardingController.quitarFoto);
+router.post("/medidas", onboardingController.guardarMedidas);
+router.delete("/medidas/:fecha", onboardingController.quitarMedidas);
 router.post("/saltar", onboardingController.saltar);
 router.post("/reabrir", onboardingController.reabrir);
 

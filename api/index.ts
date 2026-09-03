@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { dbConnect, isConnected } from "../src/config/mongo";
 import { createApp } from "../src/app";
-import { seedAdmin } from "../src/services/auth.service";
+import { seedAdmin, seedDuenas } from "../src/services/auth.service";
 import { seedCourses } from "../src/services/course.service";
 import type { Express } from "express";
 
@@ -23,6 +23,7 @@ async function ensureApp(): Promise<Express> {
     arranque = (async () => {
       await dbConnect();
       await seedAdmin();
+      await seedDuenas();
       await seedCourses();
       return createApp().app;
     })().catch((error) => {
@@ -39,6 +40,7 @@ async function ensureApp(): Promise<Express> {
     const reconectado = await dbConnect();
     if (reconectado) {
       await seedAdmin();
+      await seedDuenas();
       await seedCourses();
     }
   }

@@ -5,7 +5,8 @@ import { dbConnect, isConnected } from "../config/mongo";
 import { Order } from "../models/Order";
 import { User } from "../models/User";
 import { confirmTransaction, resendAccess } from "../services/payphone.service";
-import { pricingStatus } from "../config/pricing";
+import { pricingStatus, presaleDeadline } from "../config/pricing";
+import { beneficiosDe } from "../config/perks";
 
 /**
  * El Origin real de la petición manda: así nadie puede forzar credenciales
@@ -103,6 +104,37 @@ export async function misPagos(req: AuthRequest, res: Response, next: NextFuncti
         createdAt: o.createdAt,
       })),
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * GET /api/payments/beneficios — qué le toca a quien pregunta.
+ *
+ * Se resuelve en el servidor porque el corte depende de **cuándo compró**, y
+ * esa fecha no puede venir del navegador: bastaría cambiar el reloj del
+ * teléfono para reclamar un beneficio de pre-venta comprando en diciembre.
+ */
+export async function beneficios(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError(
+        "No pudimos conectarnos en este momento. Intenta de nuevo en unos segundos.",
+        503,
+      );
+    }
+
+    const user = await User.findById(req.user!.userId);
+    if (!user) throw new CustomError("Cuenta no encontrada", 404);
+
+    // La primera compra aprobada, no la última: quien entró en pre-venta y
+    // después sumó el segundo reto no pierde lo que ya se había ganado.
+    const primera = await Order.findOne({ email: user.email, status: "approved" })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    res.status(200).json(beneficiosDe(primera?.createdAt ?? null, presaleDeadline()));
   } catch (error) {
     next(error);
   }
