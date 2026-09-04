@@ -4,7 +4,11 @@ import { AuthRequest } from "../types/AuthRequest";
 import { dbConnect, isConnected } from "../config/mongo";
 import { Order } from "../models/Order";
 import { User } from "../models/User";
-import { confirmTransaction, resendAccess } from "../services/payphone.service";
+import {
+  confirmTransaction,
+  resendAccess,
+  type MetaSignals,
+} from "../services/payphone.service";
 import { pricingStatus, presaleDeadline } from "../config/pricing";
 import { beneficiosDe } from "../config/perks";
 
@@ -15,6 +19,37 @@ import { beneficiosDe } from "../config/perks";
 function requestOrigin(req: Request): string | undefined {
   const header = req.headers.origin || req.headers.referer;
   return typeof header === "string" && header.trim() ? header.trim() : undefined;
+}
+
+/**
+ * Detrás de Vercel el socket siempre es el proxy: la IP real viene en la
+ * cabecera. Meta la usa para cruzar la compra con la persona que vio el
+ * anuncio, así que mandar la del proxy es peor que no mandar nada.
+ */
+function clientIp(req: Request): string | null {
+  const forwarded = req.headers["x-forwarded-for"];
+  const cadena = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const primera = (cadena || "").split(",")[0]?.trim();
+  return primera || req.socket?.remoteAddress || null;
+}
+
+/**
+ * Señales del pixel que el navegador arrastra hasta la confirmación.
+ *
+ * `_fbp` y `_fbc` son cookies de primera parte que el servidor no puede leer
+ * (viven en el dominio del front), y sin ellas la venta no se atribuye al
+ * anuncio que la originó.
+ */
+function metaSignals(req: Request): MetaSignals {
+  const meta = (req.body ?? {}).meta ?? {};
+  const texto = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  return {
+    fbp: texto(meta.fbp),
+    fbc: texto(meta.fbc),
+    eventSourceUrl: texto(meta.eventSourceUrl) ?? requestOrigin(req) ?? null,
+    clientIp: clientIp(req),
+    userAgent: texto(req.headers["user-agent"]),
+  };
 }
 
 /** POST /api/payments/confirm — body: { id, clientTxId } */
@@ -30,6 +65,7 @@ export async function confirm(req: Request, res: Response, next: NextFunction) {
       String(clientTxId),
       requestOrigin(req),
       contact,
+      metaSignals(req),
     );
     res.status(200).json(result);
   } catch (error) {

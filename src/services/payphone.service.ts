@@ -6,9 +6,26 @@ import { AppEnvironment, resolveEnvironment } from "../config/environments";
 import { ACCESS_MONTHS, isKnownAmount } from "../config/pricing";
 import { sendAccessEmail } from "../helpers/email.helper";
 import { ensureMember } from "./auth.service";
+import { purchaseEventId, sendMetaEvent } from "./meta.service";
 
 /** Endpoint de confirmación de la Cajita de Pagos. */
 const CONFIRM_URL = "https://paymentbox.payphonetodoesposible.com/api/confirm";
+
+/**
+ * Señales del navegador que necesita la Conversions API de Meta.
+ *
+ * Viajan desde el front porque el servidor no las tiene: `_fbp` y `_fbc` son
+ * cookies de primera parte del pixel, y sin ellas la compra no se cruza con
+ * el clic del anuncio que la originó — es decir, la campaña no aprende de esa
+ * venta. Sobreviven al viaje a PayPhone guardadas junto al contacto.
+ */
+export interface MetaSignals {
+  fbp?: string | null;
+  fbc?: string | null;
+  clientIp?: string | null;
+  userAgent?: string | null;
+  eventSourceUrl?: string | null;
+}
 
 /** Datos que capturó nuestro formulario, para el correo y el registro. */
 export interface CheckoutContact {
@@ -88,6 +105,7 @@ export async function confirmTransaction(
   clientTxId: string,
   origin?: string,
   contact?: CheckoutContact,
+  signals?: MetaSignals,
 ): Promise<PayphoneConfirmation> {
   if (!id || !clientTxId) {
     throw new CustomError("Faltan id y clientTxId", 400);
@@ -178,6 +196,40 @@ export async function confirmTransaction(
       authorizationCode: raw.authorizationCode ?? null,
       password: cuenta.password,
     });
+  }
+
+  // Conversión a Meta. Va al final y con await: en serverless la función se
+  // congela apenas responde, así que una promesa suelta se perdería y la
+  // campaña nunca vería la venta. El envío no puede lanzar (ver meta.service),
+  // pero se blinda igual: ninguna medición vale una confirmación de pago.
+  //
+  // Solo producción: un cobro de prueba desde un preview o un túnel metería
+  // una compra falsa en el dataset y la campaña optimizaría hacia ella.
+  if (status === "approved" && environment === "prod") {
+    try {
+      await sendMetaEvent({
+        eventName: "Purchase",
+        // Determinista a partir de la transacción: el navegador llega al mismo
+        // id sin que nadie se lo pase, y Meta deduplica las dos copias.
+        eventId: purchaseEventId(raw.clientTransactionId || clientTxId),
+        eventSourceUrl: signals?.eventSourceUrl ?? undefined,
+        value: amountCents / 100,
+        currency: raw.currency || "USD",
+        contentIds: contact?.challenge ? [contact.challenge] : undefined,
+        contentName: contact?.challenge ?? null,
+        contact: {
+          email,
+          phone: contact?.phone ?? raw.phoneNumber ?? null,
+          name: contact?.name ?? raw.optionalParameter4 ?? null,
+          fbp: signals?.fbp ?? null,
+          fbc: signals?.fbc ?? null,
+          clientIp: signals?.clientIp ?? null,
+          userAgent: signals?.userAgent ?? null,
+        },
+      });
+    } catch (error) {
+      console.error("[meta] no se pudo reportar la compra:", error);
+    }
   }
 
   return {
