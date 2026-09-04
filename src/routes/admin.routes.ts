@@ -10,6 +10,8 @@ const router = Router();
 
 router.use(authMiddleware, adminMiddleware);
 router.get("/orders", adminController.listOrders);
+router.patch("/orders/:id/prueba", adminController.marcarPrueba);
+router.delete("/orders/:id", adminController.eliminarOrden);
 
 // Cursos: la ruta del método y sus videos.
 router.get("/courses", courseController.listar);
