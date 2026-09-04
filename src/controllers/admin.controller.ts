@@ -4,6 +4,7 @@ import { AuthRequest } from "../types/AuthRequest";
 import { CustomError } from "../errors/customError.error";
 import { Order } from "../models/Order";
 import { presaleCents, regularCents } from "../config/pricing";
+import { resolverChallenge } from "../helpers/challenge.helper";
 
 /** Un grupo del resumen: cuántas compras y cuánto dinero suman. */
 interface Bucket {
@@ -130,7 +131,8 @@ export async function listOrders(req: AuthRequest, res: Response, next: NextFunc
         cardHolder: o.cardHolder ?? null,
         email: o.email ?? null,
         phoneNumber: o.phoneNumber ?? null,
-        challenge: o.challenge ?? null,
+        // Las compras viejas se guardaron sin reto: se deduce del id.
+        challenge: resolverChallenge(o.challenge, o.clientTransactionId),
         accessMonths: o.accessMonths ?? null,
         accessUntil: o.accessUntil ?? null,
         authorizationCode: o.authorizationCode ?? null,
