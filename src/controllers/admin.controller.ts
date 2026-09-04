@@ -5,6 +5,7 @@ import { CustomError } from "../errors/customError.error";
 import { Order } from "../models/Order";
 import { presaleCents, regularCents } from "../config/pricing";
 import { resolverChallenge } from "../helpers/challenge.helper";
+import { consultarEstado } from "../services/payphone.service";
 
 /** Un grupo del resumen: cuántas compras y cuánto dinero suman. */
 interface Bucket {
@@ -220,6 +221,91 @@ export async function eliminarOrden(req: AuthRequest, res: Response, next: NextF
     );
 
     res.status(200).json({ id: String(order._id), mensaje: "Compra borrada." });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/** Cuántas transacciones se consultan a la vez contra PayPhone. */
+const LOTE = 5;
+
+/**
+ * POST /api/admin/orders/conciliar — le pregunta a PayPhone en qué quedó cada
+ * compra y corrige las que cambiaron.
+ *
+ * Confirmar una compra deja una foto del momento y nada más. Si después
+ * PayPhone reversa el cobro o el banco lo devuelve, nadie nos avisa: su
+ * notificación externa solo manda transacciones aprobadas. Por eso el
+ * recaudado puede alejarse del panel de PayPhone con el tiempo, y por eso
+ * hace falta volver a preguntar.
+ *
+ * Solo se tocan las de producción: las marcadas a mano como prueba se quedan
+ * donde están, que para eso se marcaron.
+ */
+export async function conciliar(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError(
+        "No pudimos conectarnos en este momento. Intenta de nuevo en unos segundos.",
+        503,
+      );
+    }
+
+    const orders = await Order.find({ environment: "prod" }).sort({ createdAt: -1 }).lean();
+
+    const cambios: {
+      id: string;
+      clientTransactionId: string;
+      buyerName: string | null;
+      email: string | null;
+      antes: string;
+      ahora: string;
+      centavos: number;
+    }[] = [];
+    let revisadas = 0;
+    let sinRespuesta = 0;
+
+    // De a pocas: son decenas de peticiones a un servicio ajeno.
+    for (let i = 0; i < orders.length; i += LOTE) {
+      const tanda = orders.slice(i, i + LOTE);
+      const estados = await Promise.all(
+        tanda.map((o) => consultarEstado(o.clientTransactionId, "prod")),
+      );
+
+      for (let j = 0; j < tanda.length; j++) {
+        const orden = tanda[j]!;
+        const estado = estados[j]!;
+
+        // No pudimos preguntar: se deja como está. No saber no es una razón
+        // para mover dinero de sitio.
+        if (!estado) {
+          sinRespuesta++;
+          continue;
+        }
+        revisadas++;
+        if (!estado.encontrada || estado.status === orden.status) continue;
+
+        await Order.findByIdAndUpdate(orden._id, { status: estado.status });
+        cambios.push({
+          id: String(orden._id),
+          clientTransactionId: orden.clientTransactionId,
+          buyerName: orden.buyerName ?? orden.cardHolder ?? null,
+          email: orden.email ?? null,
+          antes: orden.status,
+          ahora: estado.status,
+          centavos: orden.amountCents,
+        });
+      }
+    }
+
+    res.status(200).json({
+      revisadas,
+      sinRespuesta,
+      cambios,
+      mensaje: cambios.length
+        ? `${cambios.length} ${cambios.length === 1 ? "compra cambió" : "compras cambiaron"} de estado en PayPhone.`
+        : "Todo cuadra con PayPhone: ninguna compra cambió de estado.",
+    });
   } catch (error) {
     next(error);
   }
