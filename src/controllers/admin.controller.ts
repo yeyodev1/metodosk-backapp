@@ -153,3 +153,74 @@ export async function listOrders(req: AuthRequest, res: Response, next: NextFunc
     next(error);
   }
 }
+
+/**
+ * PATCH /api/admin/orders/:id/prueba — body: { esPrueba: boolean }
+ *
+ * Mueve una compra al entorno de pruebas y de vuelta. Es lo que hay que usar
+ * para sacar del recaudado los cobros que se hicieron probando: el monto sale
+ * de "Sí entró" y pasa a "Pruebas", pero el registro sigue ahí. Si mañana
+ * resulta que era una clienta de verdad, se revierte con el mismo botón.
+ */
+export async function marcarPrueba(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError(
+        "No pudimos conectarnos en este momento. Intenta de nuevo en unos segundos.",
+        503,
+      );
+    }
+
+    const { esPrueba } = req.body ?? {};
+    if (typeof esPrueba !== "boolean") {
+      throw new CustomError("Falta esPrueba (true o false)", 400);
+    }
+
+    const order = await Order.findByIdAndUpdate(
+      req.params.id,
+      { environment: esPrueba ? "test" : "prod" },
+      { new: true },
+    ).lean();
+    if (!order) throw new CustomError("Esa compra ya no existe", 404);
+
+    res.status(200).json({
+      id: String(order._id),
+      environment: order.environment,
+      mensaje: esPrueba
+        ? "Marcada como prueba: ya no cuenta como dinero recibido."
+        : "Devuelta a producción: vuelve a contar como dinero recibido.",
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * DELETE /api/admin/orders/:id — borra el registro para siempre.
+ *
+ * No hay vuelta atrás y la orden es el único rastro de quién compró, así que
+ * casi siempre lo correcto es marcarla como prueba en vez de borrarla. Se
+ * expone igual para poder limpiar basura real de las pruebas de desarrollo.
+ */
+export async function eliminarOrden(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError(
+        "No pudimos conectarnos en este momento. Intenta de nuevo en unos segundos.",
+        503,
+      );
+    }
+
+    const order = await Order.findByIdAndDelete(req.params.id).lean();
+    if (!order) throw new CustomError("Esa compra ya no existe", 404);
+
+    // Queda en los logs de Vercel por si hubo que borrarla por error.
+    console.warn(
+      `[admin] compra borrada: ${order.clientTransactionId} · ${order.email ?? "sin correo"} · ${order.amountCents} centavos`,
+    );
+
+    res.status(200).json({ id: String(order._id), mensaje: "Compra borrada." });
+  } catch (error) {
+    next(error);
+  }
+}
