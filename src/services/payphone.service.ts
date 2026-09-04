@@ -4,6 +4,7 @@ import { CustomError } from "../errors/customError.error";
 import { Order } from "../models/Order";
 import { AppEnvironment, resolveEnvironment } from "../config/environments";
 import { ACCESS_MONTHS, isKnownAmount } from "../config/pricing";
+import { resolverChallenge } from "../helpers/challenge.helper";
 import { sendAccessEmail } from "../helpers/email.helper";
 import { ensureMember } from "./auth.service";
 import { purchaseEventId, sendMetaEvent } from "./meta.service";
@@ -150,6 +151,8 @@ export async function confirmTransaction(
   const accessUntil = status === "approved" ? addMonths(new Date(), ACCESS_MONTHS) : null;
   // Preferimos el correo que escribió la compradora; el de PayPhone es el respaldo.
   const email = contact?.email?.trim() || raw.email || null;
+  // Si el navegador no lo mandó, el reto se saca del id de la transacción.
+  const challenge = resolverChallenge(contact?.challenge, raw.clientTransactionId || clientTxId);
 
   await persistOrder({
     clientTransactionId: raw.clientTransactionId || clientTxId,
@@ -164,7 +167,7 @@ export async function confirmTransaction(
     phoneNumber: contact?.phone ?? raw.phoneNumber ?? null,
     cardHolder: raw.optionalParameter4 ?? null,
     buyerName: contact?.name ?? null,
-    challenge: contact?.challenge ?? null,
+    challenge,
     accessMonths: ACCESS_MONTHS,
     accessUntil,
     payphoneResponse: raw,
@@ -180,7 +183,7 @@ export async function confirmTransaction(
           email,
           name: contact?.name ?? raw.optionalParameter4 ?? null,
           phone: contact?.phone ?? raw.phoneNumber ?? null,
-          challenge: contact?.challenge ?? null,
+          challenge,
           accessUntil,
           clientTransactionId: raw.clientTransactionId || clientTxId,
         })
@@ -189,7 +192,7 @@ export async function confirmTransaction(
     emailSent = await sendAccessEmail({
       to: email ?? "",
       name: contact?.name ?? raw.optionalParameter4 ?? null,
-      challenge: contact?.challenge ?? null,
+      challenge,
       amountCents,
       accessMonths: ACCESS_MONTHS,
       accessUntil,
@@ -240,7 +243,7 @@ export async function confirmTransaction(
     authorizationCode: raw.authorizationCode,
     amount: amountCents,
     message: raw.message,
-    challenge: contact?.challenge ?? null,
+    challenge,
     accessMonths: ACCESS_MONTHS,
     accessUntil: accessUntil ? accessUntil.toISOString() : null,
     email,
@@ -302,7 +305,7 @@ export async function resendAccess(
   const sent = await sendAccessEmail({
     to: destino,
     name: stored?.buyerName ?? raw.optionalParameter4 ?? null,
-    challenge: stored?.challenge ?? null,
+    challenge: resolverChallenge(stored?.challenge, raw.clientTransactionId || clientTxId),
     amountCents: Number(raw.amount) || 0,
     accessMonths: ACCESS_MONTHS,
     accessUntil,
