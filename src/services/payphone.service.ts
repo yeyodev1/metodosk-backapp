@@ -13,6 +13,19 @@ import { purchaseEventId, sendMetaEvent } from "./meta.service";
 const CONFIRM_URL = "https://paymentbox.payphonetodoesposible.com/api/confirm";
 
 /**
+ * Estado actual de una transacción, buscada por NUESTRA referencia.
+ *
+ * https://docs.payphone.app/api-sale
+ *
+ * Confirmar deja una foto del momento de la compra y nada más: si después
+ * PayPhone reversa el cobro (su API de Reverso funciona hasta las 20:00 del
+ * mismo día) o el banco lo devuelve, nadie nos avisa —la notificación externa
+ * de PayPhone solo manda transacciones aprobadas—. Este endpoint es la única
+ * forma de enterarse, y por eso existe la conciliación.
+ */
+const STATUS_URL = "https://pay.payphonetodoesposible.com/api/Sale/client";
+
+/**
  * Señales del navegador que necesita la Conversions API de Meta.
  *
  * Viajan desde el front porque el servidor no las tiene: `_fbp` y `_fbc` son
@@ -359,5 +372,51 @@ async function persistOrder(data: Record<string, unknown>): Promise<void> {
     );
   } catch (error) {
     console.error("[payphone] no se pudo guardar el pedido:", error);
+  }
+}
+
+/** Cómo quedó una transacción según PayPhone, hoy. */
+export interface EstadoActual {
+  status: "approved" | "canceled" | "failed";
+  amountCents: number;
+  /** null cuando PayPhone no reconoce la referencia. */
+  encontrada: boolean;
+}
+
+/**
+ * Le pregunta a PayPhone en qué quedó una transacción nuestra.
+ *
+ * Devuelve null si no se pudo averiguar —red caída, token equivocado—, que no
+ * es lo mismo que "no existe": una compra buena no puede desaparecer del
+ * recaudado porque la consulta falló.
+ */
+export async function consultarEstado(
+  clientTransactionId: string,
+  environment: AppEnvironment,
+): Promise<EstadoActual | null> {
+  const { token } = credentialsFor(environment);
+  try {
+    const response = await axios.get(`${STATUS_URL}/${encodeURIComponent(clientTransactionId)}`, {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      timeout: 15000,
+    });
+    const raw = response.data as PayphoneRaw;
+    return {
+      status: statusFrom(raw),
+      amountCents: Number(raw.amount) || 0,
+      encontrada: true,
+    };
+  } catch (error) {
+    const axiosError = error as AxiosError;
+    // 404: PayPhone no tiene esa referencia. Con cualquier otro fallo no
+    // sabemos nada, y no saber nunca debe traducirse en tocar el dato.
+    if (axiosError.response?.status === 404) {
+      return { status: "failed", amountCents: 0, encontrada: false };
+    }
+    console.error(
+      `[payphone] no se pudo consultar ${clientTransactionId}:`,
+      axiosError.response?.status ?? axiosError.message,
+    );
+    return null;
   }
 }
