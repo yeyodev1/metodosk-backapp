@@ -159,4 +159,34 @@ router.get("/probar-intent", async (req, res, next) => {
   }
 });
 
+/**
+ * GET /api/cron/enviar-ya?token=… — dispara la tanda sin esperar a la hora.
+ *
+ * El cron ya quedó restaurado y correría solo, pero puede faltar casi una
+ * hora para el próximo minuto en punto y el envío ya está aprobado.
+ *
+ * TEMPORAL: se borra con las otras rutas de prueba.
+ */
+router.get("/enviar-ya", async (req, res, next) => {
+  try {
+    if (req.query.token !== TOKEN_PRUEBA) {
+      throw new CustomError("No autorizado", 401);
+    }
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError("Sin base de datos", 503);
+    }
+    const resultado = await enviarTandaDeRecursos();
+    console.log(
+      `[recursos] ${resultado.enviados} enviados, ${resultado.fallidos} fallidos, ${resultado.pendientes} pendientes`,
+    );
+    res.status(200).json({
+      enviados: resultado.enviados,
+      fallidos: resultado.fallidos,
+      pendientes: resultado.pendientes,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
