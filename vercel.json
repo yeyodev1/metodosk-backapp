@@ -9,7 +9,7 @@
   "crons": [
     {
       "path": "/api/cron/recursos",
-      "schedule": "0 14 * * *"
+      "schedule": "0 * * * *"
     }
   ],
   "routes": [

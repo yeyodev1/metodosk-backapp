@@ -245,6 +245,10 @@ export async function ensureMember(input: {
         password: await bcrypt.hash(password, 10),
         role: "member",
         mustChangePassword: true,
+        // La lista de implementos ya va dentro del correo de acceso que esta
+        // compra dispara, así que queda marcada desde el principio: si no, la
+        // tanda diaria le mandaría un segundo correo con lo mismo.
+        recursosEnviados: new Date(),
       });
       created = true;
     }

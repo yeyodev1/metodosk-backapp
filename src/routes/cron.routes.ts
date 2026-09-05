@@ -24,11 +24,15 @@ function soloCron(req: Request, _res: Response, next: NextFunction) {
 }
 
 /**
- * GET /api/cron/recursos — la tanda diaria de la lista de implementos.
+ * GET /api/cron/recursos — la tanda de la lista de implementos.
  *
- * Vercel Cron solo hace GET, de ahí el verbo para algo que escribe. Cuando ya
- * no queda nadie pendiente no hace nada, así que puede seguir corriendo cada
- * día sin molestar a nadie.
+ * Corre cada hora, no una vez al día, para que un envío pendiente empiece
+ * dentro de la hora y no al día siguiente. No se desborda: quienes compran
+ * ahora ya reciben la lista en su correo de acceso y nacen marcadas, así que
+ * el grupo pendiente es finito —las que compraron antes— y se vacía en dos o
+ * tres corridas. A partir de ahí no hace nada.
+ *
+ * Vercel Cron solo hace GET, de ahí el verbo para algo que escribe.
  */
 router.get("/recursos", soloCron, async (_req, res, next) => {
   try {
