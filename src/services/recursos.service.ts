@@ -12,13 +12,18 @@ import { sendResourcesEmail } from "../helpers/email.helper";
  */
 
 /**
- * Cuántos correos por corrida diaria.
+ * Cuántos correos por corrida.
  *
- * El plan gratuito de Resend permite 100 al día. Se usan 40 para que siempre
- * queden 60 libres: si la cuota se agota, el correo de una compra nueva no
- * sale, y ese lleva la contraseña de la alumna.
+ * Resend permite 100 al día en el plan gratuito y hay ~50 pendientes, así que
+ * con 60 el grupo entero se vacía en una sola corrida. Se eligió ese número
+ * porque no sabemos con qué frecuencia corre el cron —depende del plan de
+ * Vercel—: si resultara ser una vez al día, con 40 el envío tardaría dos días
+ * y con 60 termina hoy.
+ *
+ * No sube más para dejar 40 libres: si la cuota se agota, el correo de una
+ * compra nueva no sale, y ese lleva la contraseña de la alumna.
  */
-const POR_TANDA = 40;
+const POR_TANDA = 60;
 
 /** Entre correo y correo. El límite de Resend son 10 por segundo. */
 const PAUSA_MS = 250;
