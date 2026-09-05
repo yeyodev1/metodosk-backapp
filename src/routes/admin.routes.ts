@@ -10,7 +10,7 @@ const router = Router();
 
 router.use(authMiddleware, adminMiddleware);
 router.get("/orders", adminController.listOrders);
-router.post("/orders/conciliar", adminController.conciliar);
+router.post("/orders/restaurar", adminController.restaurarEstados);
 router.patch("/orders/:id/prueba", adminController.marcarPrueba);
 router.delete("/orders/:id", adminController.eliminarOrden);
 

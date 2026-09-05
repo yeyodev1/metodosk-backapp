@@ -5,7 +5,7 @@ import { CustomError } from "../errors/customError.error";
 import { Order } from "../models/Order";
 import { presaleCents, regularCents } from "../config/pricing";
 import { resolverChallenge } from "../helpers/challenge.helper";
-import { consultarEstado } from "../services/payphone.service";
+import { statusFrom } from "../services/payphone.service";
 
 /** Un grupo del resumen: cuántas compras y cuánto dinero suman. */
 interface Bucket {
@@ -226,23 +226,19 @@ export async function eliminarOrden(req: AuthRequest, res: Response, next: NextF
   }
 }
 
-/** Cuántas transacciones se consultan a la vez contra PayPhone. */
-const LOTE = 5;
-
 /**
- * POST /api/admin/orders/conciliar — le pregunta a PayPhone en qué quedó cada
- * compra y corrige las que cambiaron.
+ * POST /api/admin/orders/restaurar — recalcula el estado desde la respuesta
+ * que PayPhone dio al confirmar cada compra.
  *
- * Confirmar una compra deja una foto del momento y nada más. Si después
- * PayPhone reversa el cobro o el banco lo devuelve, nadie nos avisa: su
- * notificación externa solo manda transacciones aprobadas. Por eso el
- * recaudado puede alejarse del panel de PayPhone con el tiempo, y por eso
- * hace falta volver a preguntar.
+ * Cada orden guarda esa respuesta entera en `payphoneResponse`, tal como
+ * llegó, y de ahí salió su estado la primera vez. Volver a leerla devuelve
+ * exactamente lo que había: es reconstrucción, no adivinanza.
  *
- * Solo se tocan las de producción: las marcadas a mano como prueba se quedan
- * donde están, que para eso se marcaron.
+ * Existe porque una conciliación que preguntaba el estado a otro endpoint de
+ * PayPhone interpretó mal su respuesta y marcó todo como fallido. Se queda
+ * como red de seguridad: es idempotente y no depende de la red.
  */
-export async function conciliar(req: AuthRequest, res: Response, next: NextFunction) {
+export async function restaurarEstados(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     if (!isConnected() && !(await dbConnect())) {
       throw new CustomError(
@@ -251,60 +247,36 @@ export async function conciliar(req: AuthRequest, res: Response, next: NextFunct
       );
     }
 
-    const orders = await Order.find({ environment: "prod" }).sort({ createdAt: -1 }).lean();
+    const orders = await Order.find({}).lean();
+    const corregidas: { buyerName: string | null; antes: string; ahora: string }[] = [];
+    let sinRespaldo = 0;
 
-    const cambios: {
-      id: string;
-      clientTransactionId: string;
-      buyerName: string | null;
-      email: string | null;
-      antes: string;
-      ahora: string;
-      centavos: number;
-    }[] = [];
-    let revisadas = 0;
-    let sinRespuesta = 0;
-
-    // De a pocas: son decenas de peticiones a un servicio ajeno.
-    for (let i = 0; i < orders.length; i += LOTE) {
-      const tanda = orders.slice(i, i + LOTE);
-      const estados = await Promise.all(
-        tanda.map((o) => consultarEstado(o.clientTransactionId, "prod")),
-      );
-
-      for (let j = 0; j < tanda.length; j++) {
-        const orden = tanda[j]!;
-        const estado = estados[j]!;
-
-        // No pudimos preguntar: se deja como está. No saber no es una razón
-        // para mover dinero de sitio.
-        if (!estado) {
-          sinRespuesta++;
-          continue;
-        }
-        revisadas++;
-        if (!estado.encontrada || estado.status === orden.status) continue;
-
-        await Order.findByIdAndUpdate(orden._id, { status: estado.status });
-        cambios.push({
-          id: String(orden._id),
-          clientTransactionId: orden.clientTransactionId,
-          buyerName: orden.buyerName ?? orden.cardHolder ?? null,
-          email: orden.email ?? null,
-          antes: orden.status,
-          ahora: estado.status,
-          centavos: orden.amountCents,
-        });
+    for (const orden of orders) {
+      // Sin la respuesta original no hay nada que reconstruir: se deja intacta
+      // antes que inventarle un estado.
+      if (!orden.payphoneResponse || typeof orden.payphoneResponse !== "object") {
+        sinRespaldo++;
+        continue;
       }
+
+      const original = statusFrom(orden.payphoneResponse as Record<string, never>);
+      if (original === orden.status) continue;
+
+      await Order.findByIdAndUpdate(orden._id, { status: original });
+      corregidas.push({
+        buyerName: orden.buyerName ?? orden.cardHolder ?? null,
+        antes: orden.status,
+        ahora: original,
+      });
     }
 
     res.status(200).json({
-      revisadas,
-      sinRespuesta,
-      cambios,
-      mensaje: cambios.length
-        ? `${cambios.length} ${cambios.length === 1 ? "compra cambió" : "compras cambiaron"} de estado en PayPhone.`
-        : "Todo cuadra con PayPhone: ninguna compra cambió de estado.",
+      revisadas: orders.length,
+      sinRespaldo,
+      corregidas,
+      mensaje: corregidas.length
+        ? `${corregidas.length} ${corregidas.length === 1 ? "compra recuperada" : "compras recuperadas"} desde la respuesta original de PayPhone.`
+        : "Ninguna compra necesitaba corrección: todas coinciden con lo que dijo PayPhone.",
     });
   } catch (error) {
     next(error);
