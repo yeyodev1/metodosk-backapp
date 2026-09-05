@@ -5,7 +5,7 @@ import { CustomError } from "../errors/customError.error";
 import { Order } from "../models/Order";
 import { presaleCents, regularCents } from "../config/pricing";
 import { resolverChallenge } from "../helpers/challenge.helper";
-import { statusFrom } from "../services/payphone.service";
+import { restaurarDesdeRespuestaOriginal } from "../services/restauracion.service";
 import { pendientesDeRecursos } from "../services/recursos.service";
 import { User } from "../models/User";
 
@@ -249,35 +249,11 @@ export async function restaurarEstados(req: AuthRequest, res: Response, next: Ne
       );
     }
 
-    const orders = await Order.find({}).lean();
-    const corregidas: { buyerName: string | null; antes: string; ahora: string }[] = [];
-    let sinRespaldo = 0;
-
-    for (const orden of orders) {
-      // Sin la respuesta original no hay nada que reconstruir: se deja intacta
-      // antes que inventarle un estado.
-      if (!orden.payphoneResponse || typeof orden.payphoneResponse !== "object") {
-        sinRespaldo++;
-        continue;
-      }
-
-      const original = statusFrom(orden.payphoneResponse as Record<string, never>);
-      if (original === orden.status) continue;
-
-      await Order.findByIdAndUpdate(orden._id, { status: original });
-      corregidas.push({
-        buyerName: orden.buyerName ?? orden.cardHolder ?? null,
-        antes: orden.status,
-        ahora: original,
-      });
-    }
-
+    const resultado = await restaurarDesdeRespuestaOriginal();
     res.status(200).json({
-      revisadas: orders.length,
-      sinRespaldo,
-      corregidas,
-      mensaje: corregidas.length
-        ? `${corregidas.length} ${corregidas.length === 1 ? "compra recuperada" : "compras recuperadas"} desde la respuesta original de PayPhone.`
+      ...resultado,
+      mensaje: resultado.corregidas.length
+        ? `${resultado.corregidas.length} ${resultado.corregidas.length === 1 ? "compra recuperada" : "compras recuperadas"} desde la respuesta original de PayPhone.`
         : "Ninguna compra necesitaba corrección: todas coinciden con lo que dijo PayPhone.",
     });
   } catch (error) {

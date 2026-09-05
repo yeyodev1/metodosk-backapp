@@ -3,6 +3,7 @@ import { dbConnect, isConnected } from "../config/mongo";
 import { CustomError } from "../errors/customError.error";
 import { enviarTandaDeRecursos } from "../services/recursos.service";
 import { sendResourcesEmail } from "../helpers/email.helper";
+import { restaurarDesdeRespuestaOriginal } from "../services/restauracion.service";
 
 const router = Router();
 
@@ -80,6 +81,35 @@ router.get("/recursos/prueba", async (req, res, next) => {
     }
     const ok = await sendResourcesEmail({ to: DESTINO_PRUEBA, name: "Diego" });
     res.status(200).json({ enviado: ok, a: DESTINO_PRUEBA });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/cron/restaurar?token=… — repara los estados desde acá.
+ *
+ * El botón equivalente ya existe en el panel, pero esto lo arregló quien lo
+ * rompió sin pedirle a nadie que apriete nada. Es idempotente: reconstruye
+ * desde `payphoneResponse`, así que correrlo de más no hace daño.
+ *
+ * TEMPORAL: se borra junto con la ruta de prueba de arriba.
+ */
+router.get("/restaurar", async (req, res, next) => {
+  try {
+    if (req.query.token !== TOKEN_PRUEBA) {
+      throw new CustomError("No autorizado", 401);
+    }
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError("Sin base de datos", 503);
+    }
+    const resultado = await restaurarDesdeRespuestaOriginal();
+    console.log(`[restaurar] ${resultado.corregidas.length} compras recuperadas`);
+    res.status(200).json({
+      revisadas: resultado.revisadas,
+      sinRespaldo: resultado.sinRespaldo,
+      corregidas: resultado.corregidas.length,
+    });
   } catch (error) {
     next(error);
   }
