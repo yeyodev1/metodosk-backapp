@@ -27,6 +27,14 @@ export interface IUser extends Document {
   challenges: string[];
   /** Hasta cuándo tiene acceso. null = sin acceso vigente. */
   accessUntil: Date | null;
+  /**
+   * Cuándo se le mandó la lista de implementos. null = todavía no.
+   *
+   * Es la marca que hace el envío escalonado reanudable: el plan gratuito de
+   * Resend no deja mandarlos todos de golpe, así que salen por tandas y esto
+   * es lo que impide que alguien lo reciba dos veces.
+   */
+  recursosEnviados: Date | null;
   /** Referencia de la compra que originó la cuenta. */
   clientTransactionId: string | null;
   /** true mientras siga usando la contraseña que le enviamos por correo. */
@@ -100,6 +108,7 @@ const userSchema = new Schema<IUser>(
     challenge: { type: String, default: null },
     challenges: { type: [String], default: [] },
     accessUntil: { type: Date, default: null },
+    recursosEnviados: { type: Date, default: null },
     clientTransactionId: { type: String, default: null },
     mustChangePassword: { type: Boolean, default: false },
     onboarding: {

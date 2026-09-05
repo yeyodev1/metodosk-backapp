@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { GRUPOS_RECURSOS, GrupoRecursos, recursosUrl } from "../config/recursos";
 
 /**
  * Correos transaccionales del reto, vía Resend.
@@ -115,6 +116,9 @@ function accessText(i: AccessEmailInput & { saludo: string; reto: string }): str
     i.password ? `Contraseña: ${i.password}` : "Contraseña: la que ya creaste",
     i.password ? "Cámbiala cuando entres." : "",
     "",
+    "LO QUE VAS A NECESITAR",
+    recursosText(),
+    "",
     "En las próximas horas te escribimos por WhatsApp para darte la bienvenida",
     "y entregarte el plan de entrenamiento y nutrición.",
     "",
@@ -123,6 +127,48 @@ function accessText(i: AccessEmailInput & { saludo: string; reto: string }): str
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+/**
+ * Los implementos que hay que conseguir antes de empezar.
+ *
+ * Van los dos casos —casa y gimnasio— en el mismo bloque porque al momento de
+ * comprar todavía no sabemos dónde entrena cada quien, y preguntarlo costaría
+ * un paso más en el checkout. Dos listas cortas se leen de un vistazo.
+ */
+/** La misma lista, para el texto plano. */
+function recursosText(): string {
+  return GRUPOS_RECURSOS.map(
+    (g) =>
+      `${g.titulo}: ${g.intro}\n` +
+      g.recursos.map((r) => `  - ${r.nombre}. ${r.detalle}`).join("\n"),
+  ).join("\n\n");
+}
+
+function recursosHtml(): string {
+  const grupo = (g: GrupoRecursos) => `
+    <div style="margin-bottom:16px;">
+      <div style="color:#191413;font-size:14px;font-weight:600;margin-bottom:2px;">${g.titulo}</div>
+      <div style="color:#8a8078;font-size:13px;line-height:1.5;margin-bottom:8px;">${g.intro}</div>
+      ${g.recursos
+        .map(
+          (r) => `
+        <div style="padding:8px 0;border-top:1px solid #ece4dc;">
+          <div style="color:#191413;font-size:14px;font-weight:600;">${r.nombre}</div>
+          <div style="color:#5c534c;font-size:13px;line-height:1.5;">${r.detalle}</div>
+        </div>`,
+        )
+        .join("")}
+    </div>`;
+
+  return `
+    <div style="margin:0 0 20px;padding:18px 20px;border-radius:12px;background:#f6f1ec;">
+      <div style="color:#8a8078;font-size:12px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;">Lo que vas a necesitar</div>
+      ${GRUPOS_RECURSOS.map(grupo).join("")}
+      <a href="${recursosUrl()}" style="display:block;margin-top:4px;padding:12px 20px;border-radius:999px;border:1px solid #d9cec4;color:#191413;font-size:13px;font-weight:600;text-align:center;text-decoration:none;">
+        Ver la lista completa
+      </a>
+    </div>`;
 }
 
 function accessHtml(i: AccessEmailInput & { saludo: string; reto: string }): string {
@@ -183,10 +229,102 @@ function accessHtml(i: AccessEmailInput & { saludo: string; reto: string }): str
                   }
                 </div>
 
+                ${recursosHtml()}
+
                 <p style="margin:0 0 8px;color:#5c534c;font-size:15px;line-height:1.6;">
                   En las próximas horas te escribimos por WhatsApp para darte la bienvenida y
                   entregarte tu plan de entrenamiento y nutrición.
                 </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 28px;color:#8a8078;font-size:13px;line-height:1.6;">
+                Scarlet Córdova · entrenamiento<br />
+                Karen López · nutrición
+              </td>
+            </tr>
+          </table>
+          <div style="max-width:520px;margin-top:16px;color:#a39a92;font-size:12px;">
+            Recibes este correo porque compraste el reto en metodosk.ec
+          </div>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+/**
+ * La lista de implementos, sola, para quienes compraron antes de que el correo
+ * de acceso la incluyera.
+ *
+ * Es un envío de una sola vez por alumna: `recursosEnviados` en User marca a
+ * quién ya le llegó, para que nadie lo reciba dos veces.
+ */
+export async function sendResourcesEmail(input: {
+  to: string;
+  name?: string | null;
+}): Promise<boolean> {
+  const resend = getResend();
+  if (!resend || !input.to) return false;
+
+  const firstName = (input.name || "").trim().split(/\s+/)[0] || "";
+  const saludo = firstName ? `¡Hola ${firstName}!` : "¡Hola!";
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: sender(),
+      to: input.to,
+      subject: "Lo que necesitas para empezar tu reto — Método SK",
+      html: resourcesHtml(saludo),
+      text: [
+        saludo,
+        "",
+        "Antes de arrancar, esto es todo lo que vas a necesitar.",
+        "",
+        recursosText(),
+        "",
+        `Lo tienes siempre a mano acá: ${recursosUrl()}`,
+        "",
+        "Scarlet Córdova y Karen López",
+        "Método SK",
+      ].join("\n"),
+    });
+
+    if (error) {
+      console.error(`[email] Resend rechazó los recursos de ${input.to}:`, error);
+      return false;
+    }
+    console.log(`[email] recursos enviados a ${input.to} · resend_id=${data?.id ?? "?"}`);
+    return true;
+  } catch (error) {
+    console.error("[email] no se pudieron enviar los recursos:", error);
+    return false;
+  }
+}
+
+function resourcesHtml(saludo: string): string {
+  return `<!doctype html>
+<html lang="es">
+  <body style="margin:0;padding:0;background:#f6f1ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f1ec;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fffdfb;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background:#191413;padding:28px 32px;">
+                <div style="color:#f3d9cf;font-size:12px;letter-spacing:.12em;text-transform:uppercase;">Método SK</div>
+                <div style="color:#fffdfb;font-size:26px;margin-top:6px;">Prepara tu equipo</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 32px;">
+                <p style="margin:0 0 14px;color:#191413;font-size:16px;">${saludo}</p>
+                <p style="margin:0 0 20px;color:#5c534c;font-size:15px;line-height:1.6;">
+                  Antes de que arranquemos, ten esto listo. No necesitas nada más:
+                  el reto está diseñado para que funcione con lo mínimo.
+                </p>
+                ${recursosHtml()}
               </td>
             </tr>
             <tr>
