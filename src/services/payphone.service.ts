@@ -2,6 +2,7 @@ import axios, { AxiosError } from "axios";
 import mongoose from "mongoose";
 import { CustomError } from "../errors/customError.error";
 import { Order } from "../models/Order";
+import { CheckoutIntent } from "../models/CheckoutIntent";
 import { AppEnvironment, resolveEnvironment } from "../config/environments";
 import { ACCESS_MONTHS, isKnownAmount } from "../config/pricing";
 import { resolverChallenge } from "../helpers/challenge.helper";
@@ -138,6 +139,25 @@ export async function confirmTransaction(
     );
   }
 
+  /**
+   * Lo que escribió la compradora, recuperado del servidor.
+   *
+   * El navegador manda `contact` cuando pudo conservarlo, pero eso vive en
+   * `sessionStorage` y se pierde al volver de PayPhone en otra pestaña — que
+   * es lo normal entrando desde Instagram. Sin este respaldo, el correo de
+   * credenciales se iba al que PayPhone tiene guardado para la tarjeta, que
+   * suele ser otro, o no se iba a ninguno.
+   *
+   * Manda lo que llegó del navegador solo si trae dato; si no, lo guardado.
+   */
+  const guardado = await buscarIntent(raw.clientTransactionId || clientTxId);
+  const datos: CheckoutContact = {
+    name: contact?.name?.trim() || guardado?.name || undefined,
+    email: contact?.email?.trim() || guardado?.email || undefined,
+    phone: contact?.phone?.trim() || guardado?.phone || undefined,
+    challenge: contact?.challenge?.trim() || guardado?.challenge || undefined,
+  };
+
   const status = statusFrom(raw);
   const amountCents = Number(raw.amount) || 0;
   const amountVerified = isKnownAmount(amountCents);
@@ -151,9 +171,9 @@ export async function confirmTransaction(
 
   const accessUntil = status === "approved" ? addMonths(new Date(), ACCESS_MONTHS) : null;
   // Preferimos el correo que escribió la compradora; el de PayPhone es el respaldo.
-  const email = contact?.email?.trim() || raw.email || null;
+  const email = datos.email || raw.email || null;
   // Si el navegador no lo mandó, el reto se saca del id de la transacción.
-  const challenge = resolverChallenge(contact?.challenge, raw.clientTransactionId || clientTxId);
+  const challenge = resolverChallenge(datos.challenge, raw.clientTransactionId || clientTxId);
 
   await persistOrder({
     clientTransactionId: raw.clientTransactionId || clientTxId,
@@ -165,9 +185,9 @@ export async function confirmTransaction(
     authorizationCode: raw.authorizationCode ?? null,
     environment,
     email,
-    phoneNumber: contact?.phone ?? raw.phoneNumber ?? null,
+    phoneNumber: datos.phone ?? raw.phoneNumber ?? null,
     cardHolder: raw.optionalParameter4 ?? null,
-    buyerName: contact?.name ?? null,
+    buyerName: datos.name ?? null,
     challenge,
     accessMonths: ACCESS_MONTHS,
     accessUntil,
@@ -182,8 +202,8 @@ export async function confirmTransaction(
     const cuenta = email
       ? await ensureMember({
           email,
-          name: contact?.name ?? raw.optionalParameter4 ?? null,
-          phone: contact?.phone ?? raw.phoneNumber ?? null,
+          name: datos.name ?? raw.optionalParameter4 ?? null,
+          phone: datos.phone ?? raw.phoneNumber ?? null,
           challenge,
           accessUntil,
           clientTransactionId: raw.clientTransactionId || clientTxId,
@@ -192,7 +212,7 @@ export async function confirmTransaction(
 
     emailSent = await sendAccessEmail({
       to: email ?? "",
-      name: contact?.name ?? raw.optionalParameter4 ?? null,
+      name: datos.name ?? raw.optionalParameter4 ?? null,
       challenge,
       amountCents,
       accessMonths: ACCESS_MONTHS,
@@ -219,12 +239,12 @@ export async function confirmTransaction(
         eventSourceUrl: signals?.eventSourceUrl ?? undefined,
         value: amountCents / 100,
         currency: raw.currency || "USD",
-        contentIds: contact?.challenge ? [contact.challenge] : undefined,
-        contentName: contact?.challenge ?? null,
+        contentIds: challenge ? [challenge] : undefined,
+        contentName: challenge,
         contact: {
           email,
-          phone: contact?.phone ?? raw.phoneNumber ?? null,
-          name: contact?.name ?? raw.optionalParameter4 ?? null,
+          phone: datos.phone ?? raw.phoneNumber ?? null,
+          name: datos.name ?? raw.optionalParameter4 ?? null,
           fbp: signals?.fbp ?? null,
           fbc: signals?.fbc ?? null,
           clientIp: signals?.clientIp ?? null,
@@ -344,6 +364,16 @@ async function findOrder(clientTransactionId: string) {
   if (mongoose.connection.readyState !== 1) return null;
   try {
     return await Order.findOne({ clientTransactionId }).lean();
+  } catch {
+    return null;
+  }
+}
+
+/** El contacto que se guardó antes del redirect, si lo hay. */
+async function buscarIntent(clientTransactionId: string) {
+  if (mongoose.connection.readyState !== 1) return null;
+  try {
+    return await CheckoutIntent.findOne({ clientTransactionId }).lean();
   } catch {
     return null;
   }

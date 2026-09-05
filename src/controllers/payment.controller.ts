@@ -3,6 +3,7 @@ import { CustomError } from "../errors/customError.error";
 import { AuthRequest } from "../types/AuthRequest";
 import { dbConnect, isConnected } from "../config/mongo";
 import { Order } from "../models/Order";
+import { CheckoutIntent } from "../models/CheckoutIntent";
 import { User } from "../models/User";
 import {
   confirmTransaction,
@@ -173,5 +174,52 @@ export async function beneficios(req: AuthRequest, res: Response, next: NextFunc
     res.status(200).json(beneficiosDe(primera?.createdAt ?? null, presaleDeadline()));
   } catch (error) {
     next(error);
+  }
+}
+
+/**
+ * POST /api/payments/intent — guarda el contacto antes de salir a PayPhone.
+ *
+ * body: { clientTransactionId, name?, email?, phone?, challenge? }
+ *
+ * Es lo que hace que las credenciales lleguen al correo que la compradora
+ * escribió y no al que PayPhone tenga asociado a su tarjeta. Ver el comentario
+ * del modelo CheckoutIntent para el porqué.
+ *
+ * Nunca falla hacia el cliente: si esto se cae, la compra tiene que poder
+ * seguir igual. Se responde 200 con `guardado:false` y la confirmación usará
+ * los respaldos de siempre.
+ */
+export async function guardarIntent(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { clientTransactionId, name, email, phone, challenge } = req.body ?? {};
+    if (!clientTransactionId) {
+      throw new CustomError("Falta clientTransactionId", 400);
+    }
+
+    if (!isConnected() && !(await dbConnect())) {
+      return res.status(200).json({ guardado: false });
+    }
+
+    const texto = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+
+    await CheckoutIntent.findOneAndUpdate(
+      { clientTransactionId: String(clientTransactionId) },
+      {
+        clientTransactionId: String(clientTransactionId),
+        name: texto(name),
+        email: texto(email)?.toLowerCase() ?? null,
+        phone: texto(phone),
+        challenge: texto(challenge),
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+
+    res.status(200).json({ guardado: true });
+  } catch (error) {
+    // Un fallo acá no puede impedir que alguien compre.
+    if (error instanceof CustomError && error.status === 400) return next(error);
+    console.error("[payments] no se pudo guardar el intent:", error);
+    res.status(200).json({ guardado: false });
   }
 }

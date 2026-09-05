@@ -4,6 +4,8 @@ import * as paymentController from "../controllers/payment.controller";
 
 const router = Router();
 
+// Antes del redirect: sin esto, la confirmación no sabe qué correo escribió.
+router.post("/intent", paymentController.guardarIntent);
 router.post("/confirm", paymentController.confirm);
 router.post("/resend", paymentController.resend);
 router.get("/pricing", paymentController.pricing);
