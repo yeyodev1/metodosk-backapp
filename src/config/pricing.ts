@@ -7,8 +7,8 @@
  */
 
 const DEFAULT_PRESALE_CENTS = 6700;
-const DEFAULT_REGULAR_CENTS = 8700;
-const DEFAULT_PRESALE_DEADLINE = "2026-09-07T23:59:59-05:00";
+const DEFAULT_REGULAR_CENTS = 11100;
+const DEFAULT_PRESALE_DEADLINE = "2026-09-14T23:59:59-05:00";
 
 /** Meses de acceso que otorga la compra. */
 export const ACCESS_MONTHS = 3;
