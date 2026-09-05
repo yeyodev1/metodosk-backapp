@@ -4,6 +4,7 @@ import { CustomError } from "../errors/customError.error";
 import { enviarTandaDeRecursos } from "../services/recursos.service";
 import { sendResourcesEmail } from "../helpers/email.helper";
 import { restaurarDesdeRespuestaOriginal } from "../services/restauracion.service";
+import { CheckoutIntent } from "../models/CheckoutIntent";
 
 const router = Router();
 
@@ -109,6 +110,49 @@ router.get("/restaurar", async (req, res, next) => {
       revisadas: resultado.revisadas,
       sinRespaldo: resultado.sinRespaldo,
       corregidas: resultado.corregidas.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/cron/probar-intent?token=… — comprueba el camino del contacto.
+ *
+ * Escribe un intent de mentira, lo vuelve a leer como lo hace la confirmación
+ * y lo borra. Si el correo que sale es el que entró, el arreglo funciona en
+ * producción y no solo en el editor.
+ *
+ * TEMPORAL: se borra con las otras rutas de prueba.
+ */
+router.get("/probar-intent", async (req, res, next) => {
+  try {
+    if (req.query.token !== TOKEN_PRUEBA) {
+      throw new CustomError("No autorizado", 401);
+    }
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError("Sin base de datos", 503);
+    }
+
+    const id = `PRUEBA-INTENT-${Date.now()}`;
+    const escrito = "el-correo-que-ella-escribio@ejemplo.com";
+
+    await CheckoutIntent.findOneAndUpdate(
+      { clientTransactionId: id },
+      { clientTransactionId: id, name: "Prueba", email: escrito, phone: "0999", challenge: "SK Recomposición" },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+
+    const leido = await CheckoutIntent.findOne({ clientTransactionId: id }).lean();
+    await CheckoutIntent.deleteOne({ clientTransactionId: id });
+
+    res.status(200).json({
+      guardado: Boolean(leido),
+      correoEscrito: escrito,
+      correoRecuperado: leido?.email ?? null,
+      coincide: leido?.email === escrito,
+      retoRecuperado: leido?.challenge ?? null,
+      limpiado: true,
     });
   } catch (error) {
     next(error);
