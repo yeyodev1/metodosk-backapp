@@ -6,7 +6,7 @@ import { Order } from "../models/Order";
 import { presaleCents, regularCents } from "../config/pricing";
 import { resolverChallenge } from "../helpers/challenge.helper";
 import { statusFrom } from "../services/payphone.service";
-import { enviarTandaDeRecursos, pendientesDeRecursos } from "../services/recursos.service";
+import { pendientesDeRecursos } from "../services/recursos.service";
 import { User } from "../models/User";
 
 /** Un grupo del resumen: cuántas compras y cuánto dinero suman. */
@@ -303,33 +303,6 @@ export async function estadoRecursos(req: AuthRequest, res: Response, next: Next
     ]);
 
     res.status(200).json({ total, pendientes, enviados: total - pendientes });
-  } catch (error) {
-    next(error);
-  }
-}
-
-/**
- * POST /api/admin/recursos/enviar — manda la siguiente tanda a mano.
- *
- * El cron diario hace esto solo; el botón existe para arrancar sin esperar y
- * para reintentar si una tanda falló.
- */
-export async function enviarRecursos(req: AuthRequest, res: Response, next: NextFunction) {
-  try {
-    if (!isConnected() && !(await dbConnect())) {
-      throw new CustomError(
-        "No pudimos conectarnos en este momento. Intenta de nuevo en unos segundos.",
-        503,
-      );
-    }
-
-    const resultado = await enviarTandaDeRecursos();
-    res.status(200).json({
-      ...resultado,
-      mensaje: resultado.enviados
-        ? `${resultado.enviados} ${resultado.enviados === 1 ? "correo enviado" : "correos enviados"}. Quedan ${resultado.pendientes}.`
-        : "No había nadie pendiente.",
-    });
   } catch (error) {
     next(error);
   }

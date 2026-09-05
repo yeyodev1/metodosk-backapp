@@ -14,10 +14,9 @@ router.post("/orders/restaurar", adminController.restaurarEstados);
 router.patch("/orders/:id/prueba", adminController.marcarPrueba);
 router.delete("/orders/:id", adminController.eliminarOrden);
 
-// La lista de implementos que se manda a quienes compraron antes de que el
-// correo de acceso la incluyera. Sale por tandas: ver recursos.service.
+// Solo lectura: cómo va el envío de la lista de implementos. El envío lo hace
+// el cron diario (ver cron.routes), no una acción de nadie.
 router.get("/recursos", adminController.estadoRecursos);
-router.post("/recursos/enviar", adminController.enviarRecursos);
 
 // Cursos: la ruta del método y sus videos.
 router.get("/courses", courseController.listar);

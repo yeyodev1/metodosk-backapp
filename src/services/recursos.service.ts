@@ -12,12 +12,13 @@ import { sendResourcesEmail } from "../helpers/email.helper";
  */
 
 /**
- * Cuántos correos por corrida.
+ * Cuántos correos por corrida diaria.
  *
- * Bien por debajo del tope diario del plan gratuito, para que siempre quede
- * margen para los correos de compra del día.
+ * El plan gratuito de Resend permite 100 al día. Se usan 40 para que siempre
+ * queden 60 libres: si la cuota se agota, el correo de una compra nueva no
+ * sale, y ese lleva la contraseña de la alumna.
  */
-const POR_TANDA = 25;
+const POR_TANDA = 40;
 
 /** Entre correo y correo. El límite de Resend son 10 por segundo. */
 const PAUSA_MS = 250;
