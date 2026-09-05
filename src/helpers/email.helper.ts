@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import { GRUPOS_RECURSOS, GrupoRecursos, recursosUrl } from "../config/recursos";
+import { GRUPOS_RECURSOS, GrupoRecursos, fotoUrl, recursosUrl } from "../config/recursos";
 
 /**
  * Correos transaccionales del reto, vía Resend.
@@ -146,19 +146,36 @@ function recursosText(): string {
 }
 
 function recursosHtml(): string {
-  const grupo = (g: GrupoRecursos) => `
-    <div style="margin-bottom:16px;">
-      <div style="color:#191413;font-size:14px;font-weight:600;margin-bottom:2px;">${g.titulo}</div>
-      <div style="color:#8a8078;font-size:13px;line-height:1.5;margin-bottom:8px;">${g.intro}</div>
-      ${g.recursos
-        .map(
-          (r) => `
-        <div style="padding:8px 0;border-top:1px solid #ece4dc;">
+  /**
+   * Cada implemento en una fila de tabla con la foto a la izquierda.
+   *
+   * Tabla y no flexbox porque Outlook ignora buena parte del CSS moderno y
+   * apilaría todo. El `width` va como atributo además de en el estilo por la
+   * misma razón.
+   *
+   * La foto lleva borde y fondo blanco: vienen de una tienda, con fondos
+   * claros distintos entre sí, y sin eso se ven como capturas sueltas pegadas
+   * sobre el crema del correo.
+   */
+  const item = (r: { nombre: string; detalle: string; foto: string }) => `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #ece4dc;">
+      <tr>
+        <td width="88" valign="top" style="padding:12px 12px 12px 0;width:88px;">
+          <img src="${fotoUrl(r.foto)}" width="88" height="66" alt="${r.nombre}"
+               style="display:block;width:88px;height:66px;object-fit:contain;border-radius:8px;background:#ffffff;border:1px solid #ece4dc;" />
+        </td>
+        <td valign="top" style="padding:12px 0;">
           <div style="color:#191413;font-size:14px;font-weight:600;">${r.nombre}</div>
           <div style="color:#5c534c;font-size:13px;line-height:1.5;">${r.detalle}</div>
-        </div>`,
-        )
-        .join("")}
+        </td>
+      </tr>
+    </table>`;
+
+  const grupo = (g: GrupoRecursos) => `
+    <div style="margin-bottom:18px;">
+      <div style="color:#191413;font-size:15px;font-weight:600;margin-bottom:2px;">${g.titulo}</div>
+      <div style="color:#8a8078;font-size:13px;line-height:1.5;margin-bottom:6px;">${g.intro}</div>
+      ${g.recursos.map(item).join("")}
     </div>`;
 
   return `

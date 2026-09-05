@@ -13,6 +13,13 @@ export interface Recurso {
   nombre: string;
   /** Para qué sirve. Una línea: el correo no es el sitio para explayarse. */
   detalle: string;
+  /**
+   * Ruta de la foto, servida por el frontend desde `public/recursos/`.
+   *
+   * Se convierte en URL absoluta con `fotoUrl` antes de meterla en el correo:
+   * un cliente de correo no resuelve rutas relativas.
+   */
+  foto: string;
 }
 
 export interface GrupoRecursos {
@@ -28,15 +35,18 @@ export const RECURSOS_CASA: GrupoRecursos = {
   recursos: [
     {
       nombre: "Mancuernas",
+      foto: "/recursos/mancuernas.jpg",
       detalle:
         "Un par. Si es tu primera vez, entre 3 y 5 kg cada una te va a servir para casi todo.",
     },
     {
       nombre: "Banda de resistencia",
+      foto: "/recursos/banda.jpg",
       detalle: "De tela, de las que se ponen sobre el pantalón y no se enrollan.",
     },
     {
       nombre: "Mat o colchoneta",
+      foto: "/recursos/mat.jpg",
       detalle: "Para el trabajo de piso. Mientras más gruesa, más cómodas las rodillas.",
     },
   ],
@@ -48,12 +58,19 @@ export const RECURSOS_GYM: GrupoRecursos = {
   recursos: [
     {
       nombre: "Banda de resistencia",
+      foto: "/recursos/banda.jpg",
       detalle: "De tela. Es la única que no vas a encontrar en la mayoría de gimnasios.",
     },
   ],
 };
 
 export const GRUPOS_RECURSOS = [RECURSOS_CASA, RECURSOS_GYM];
+
+/** La foto, en absoluto: un correo no resuelve rutas relativas. */
+export function fotoUrl(ruta: string): string {
+  const base = (process.env.SITE_URL || "https://metodosk.ec").replace(/\/$/, "");
+  return `${base}${ruta}`;
+}
 
 /** Dónde ve la alumna esta misma lista dentro de la plataforma. */
 export function recursosUrl(): string {
