@@ -1,4 +1,5 @@
 import { User } from "../models/User";
+import { Setting } from "../models/Setting";
 import { sendResourcesEmail } from "../helpers/email.helper";
 
 /**
@@ -30,6 +31,53 @@ const PAUSA_MS = 250;
 
 const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Cuándo empezó a salir el correo con las fotos de los implementos.
+ *
+ * Las fotos se desplegaron a las 10:52 del 5 de septiembre. La tanda de las
+ * 10:00 —unas 40 alumnas— salió antes, con las listas correctas pero sin
+ * imágenes. A quien lo recibió antes de este corte se le vuelve a mandar.
+ */
+const CORTE_FOTOS = new Date("2026-09-05T11:00:00-05:00");
+
+/** Marca en la base de que el reenvío ya se programó. Solo ocurre una vez. */
+const CLAVE_REENVIO = "recursos:reenvio-con-fotos";
+
+/**
+ * Vuelve a poner en cola a quienes recibieron la versión sin fotos.
+ *
+ * No manda nada por su cuenta: solo les borra la marca de "ya enviado" para
+ * que la tanda normal las recoja. Así el reenvío usa el mismo camino, el
+ * mismo ritmo y el mismo tope que el envío original, en vez de ser un
+ * proceso aparte que haya que vigilar.
+ *
+ * Se ejecuta una sola vez: la marca en `Setting` es lo que impide que cada
+ * corrida del cron reencole a las mismas y les mande el correo en bucle.
+ */
+async function programarReenvioConFotos(): Promise<number> {
+  const yaHecho = await Setting.findOne({ key: CLAVE_REENVIO }).lean();
+  if (yaHecho) return 0;
+
+  // La marca va ANTES de reencolar. Si algo falla a mitad, el peor caso es
+  // que alguien no reciba el reenvío; el peor caso al revés sería un bucle
+  // de correos, y eso no se puede deshacer.
+  await Setting.findOneAndUpdate(
+    { key: CLAVE_REENVIO },
+    { key: CLAVE_REENVIO, value: { programadoEn: new Date(), corte: CORTE_FOTOS } },
+    { upsert: true },
+  );
+
+  const { modifiedCount } = await User.updateMany(
+    { recursosEnviados: { $ne: null, $lt: CORTE_FOTOS } },
+    { $set: { recursosEnviados: null } },
+  );
+
+  if (modifiedCount) {
+    console.log(`[recursos] ${modifiedCount} alumnas reencoladas para el correo con fotos`);
+  }
+  return modifiedCount;
+}
+
 export interface ResultadoEnvio {
   enviados: number;
   fallidos: number;
@@ -50,6 +98,10 @@ export async function pendientesDeRecursos(): Promise<number> {
  * queda pendiente y entra en la próxima corrida.
  */
 export async function enviarTandaDeRecursos(limite = POR_TANDA): Promise<ResultadoEnvio> {
+  // La primera corrida reencola a quienes recibieron la versión sin fotos.
+  // Después de esa vez no hace nada, y esta llamada sale gratis.
+  await programarReenvioConFotos();
+
   const usuarias = await User.find({ recursosEnviados: null, email: { $ne: null } })
     .sort({ createdAt: 1 })
     .limit(limite);
