@@ -15,7 +15,7 @@
 const DEFAULT_TELEGRAM_DEADLINE = "2026-09-14T23:59:59-05:00";
 
 /** Cuándo se abre lo que hoy está prometido. null = "pronto", sin fecha. */
-const DEFAULT_APERTURA = "2026-09-15T00:00:00-05:00";
+const DEFAULT_APERTURA = "2026-09-14T00:00:00-05:00";
 
 export function telegramDeadline(): Date {
   const parsed = new Date(process.env.TELEGRAM_DEADLINE || DEFAULT_TELEGRAM_DEADLINE);
