@@ -86,6 +86,22 @@ export interface IUser extends Document {
    * null = se pinta su inicial.
    */
   avatarPublicId: string | null;
+  /**
+   * Su cuenta de Telegram, una vez que se la vinculó el bot.
+   *
+   * Un correo se vincula a **una sola** cuenta de Telegram: es lo que impide
+   * que un enlace de compra se reparta entre varias. `enlaces` guarda la
+   * entrada personal a cada grupo, que sirve para una sola persona.
+   */
+  telegram: {
+    userId: number | null;
+    nombre: string | null;
+    username: string | null;
+    vinculadoEl: Date | null;
+    enlaces: Partial<
+      Record<"comunidad" | "premium", { enlace: string; createdAt: Date } | null>
+    >;
+  };
   lastLoginAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -145,6 +161,16 @@ const userSchema = new Schema<IUser>(
       default: [],
     },
     avatarPublicId: { type: String, default: null },
+    telegram: {
+      userId: { type: Number, default: null, index: true },
+      nombre: { type: String, default: null },
+      username: { type: String, default: null },
+      vinculadoEl: { type: Date, default: null },
+      enlaces: {
+        comunidad: { type: { _id: false, enlace: String, createdAt: Date }, default: null },
+        premium: { type: { _id: false, enlace: String, createdAt: Date }, default: null },
+      },
+    },
     lastLoginAt: { type: Date, default: null },
   },
   { timestamps: true },

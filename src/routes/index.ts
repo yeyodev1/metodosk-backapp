@@ -10,6 +10,7 @@ import onboardingRouter from "./onboarding.routes";
 import communityRouter from "./community.routes";
 import metaRouter from "./meta.routes";
 import cronRouter from "./cron.routes";
+import telegramRouter from "./telegram.routes";
 
 function routerApi(app: Application) {
   const router = express.Router();
@@ -26,6 +27,7 @@ function routerApi(app: Application) {
   router.use("/comunidad", communityRouter);
   router.use("/meta", metaRouter);
   router.use("/cron", cronRouter);
+  router.use("/telegram", telegramRouter);
 }
 
 export default routerApi;
