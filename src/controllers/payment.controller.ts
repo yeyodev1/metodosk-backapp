@@ -171,7 +171,11 @@ export async function beneficios(req: AuthRequest, res: Response, next: NextFunc
       .sort({ createdAt: 1 })
       .lean();
 
-    res.status(200).json(beneficiosDe(primera?.createdAt ?? null, presaleDeadline()));
+    // La administración no compró nada, pero es dueña de todo: ve la app con
+    // cada beneficio incluido, que es como la ven las alumnas que entraron a
+    // tiempo. Sin esto, revisar la app "como alumna" mostraba costo aparte.
+    const fecha = user.role === "admin" ? user.createdAt : (primera?.createdAt ?? null);
+    res.status(200).json(beneficiosDe(fecha, presaleDeadline()));
   } catch (error) {
     next(error);
   }

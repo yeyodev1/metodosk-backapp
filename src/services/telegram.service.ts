@@ -125,6 +125,9 @@ export async function tokenDe(user: IUser): Promise<string> {
 }
 
 async function beneficiosDe_(user: IUser): Promise<Beneficios> {
+  // La administración es dueña del grupo: entra siempre, sin compra.
+  if (user.role === "admin") return beneficiosDe(user.createdAt, presaleDeadline());
+
   const primera = await Order.findOne({ email: user.email, status: "approved" })
     .sort({ createdAt: 1 })
     .lean();
