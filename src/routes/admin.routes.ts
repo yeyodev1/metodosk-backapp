@@ -18,6 +18,11 @@ router.delete("/orders/:id", adminController.eliminarOrden);
 // el cron diario (ver cron.routes), no una acción de nadie.
 router.get("/recursos", adminController.estadoRecursos);
 
+// El aviso de "ya se abrió tu grupo de Telegram": se dispara una vez y el
+// cron hace el resto.
+router.get("/telegram", adminController.estadoTelegram);
+router.post("/telegram/avisar", adminController.avisarTelegram);
+
 // Cursos: la ruta del método y sus videos.
 router.get("/courses", courseController.listar);
 router.post("/courses", courseController.crear);

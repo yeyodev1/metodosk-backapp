@@ -41,6 +41,17 @@ export const GRUPOS_TELEGRAM: DefinicionGrupo[] = [
   },
 ];
 
+/** El usuario del bot, sin arroba. */
+export const BOT_USERNAME = "metodosk_bot";
+
+/**
+ * El enlace que abre el bot. Con token, el bot reconoce a la alumna al
+ * primer toque y no le pide el correo; sin token, se lo pide.
+ */
+export function botUrl(token?: string | null): string {
+  return `https://t.me/${BOT_USERNAME}?start=${token || "app"}`;
+}
+
 export function telegramToken(): string | null {
   const token = (process.env.TELEGRAM_BOT_TOKEN || "").trim();
   return token || null;

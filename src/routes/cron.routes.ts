@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { dbConnect, isConnected } from "../config/mongo";
 import { CustomError } from "../errors/customError.error";
 import { enviarTandaDeRecursos } from "../services/recursos.service";
+import { enviarTandaDeAviso } from "../services/telegramAviso.service";
 
 const router = Router();
 
@@ -42,6 +43,27 @@ router.get("/recursos", soloCron, async (_req, res, next) => {
     const resultado = await enviarTandaDeRecursos();
     console.log(
       `[cron] recursos: ${resultado.enviados} enviados, ${resultado.fallidos} fallidos, ${resultado.pendientes} pendientes`,
+    );
+    res.status(200).json(resultado);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/cron/telegram — la tanda del aviso "ya se abrió tu grupo".
+ *
+ * Hasta que la administración dé la orden desde el panel no manda nada;
+ * después vacía la cola una tanda por hora y recoge a quien compre luego.
+ */
+router.get("/telegram", soloCron, async (_req, res, next) => {
+  try {
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError("Sin base de datos", 503);
+    }
+    const resultado = await enviarTandaDeAviso();
+    console.log(
+      `[cron] telegram: ${resultado.enviados} enviados, ${resultado.fallidos} fallidos, ${resultado.pendientes} pendientes`,
     );
     res.status(200).json(resultado);
   } catch (error) {

@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { GRUPOS_RECURSOS, GrupoRecursos, fotoUrl, recursosUrl } from "../config/recursos";
+import { BOT_USERNAME } from "../config/telegram";
 
 /**
  * Correos transaccionales del reto, vía Resend.
@@ -359,4 +360,138 @@ function resourcesHtml(saludo: string): string {
     </table>
   </body>
 </html>`;
+}
+
+/* ── El grupo de Telegram ya está abierto ───────────────────────────────── */
+
+/**
+ * Aviso de que ya puede entrar al grupo.
+ *
+ * Lleva su enlace con llave: al tocarlo, el bot la reconoce y le manda la
+ * entrada sin pedirle nada. Igual se le dice qué correo escribir, por si
+ * abre Telegram por su cuenta. Nunca lanza: una tanda no se cae por un
+ * correo que rebota.
+ */
+export async function sendTelegramEmail(input: {
+  to: string;
+  name?: string | null;
+  botUrl: string;
+}): Promise<boolean> {
+  const resend = getResend();
+  if (!resend || !input.to) return false;
+
+  const firstName = (input.name || "").trim().split(/\s+/)[0] || "";
+  const saludo = firstName ? `¡Hola ${firstName}!` : "¡Hola!";
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: sender(),
+      to: input.to,
+      subject: "💖 Ya se abrió tu grupo de Telegram — Método SK",
+      html: telegramHtml({ saludo, correo: input.to, botUrl: input.botUrl }),
+      text: [
+        saludo,
+        "",
+        "¡Ya se abrió tu grupo de Telegram con Scarlett y Karen! 🎉",
+        "",
+        "Entra por aquí (te reconoce sola, solo toca Iniciar):",
+        input.botUrl,
+        "",
+        `Si el bot te pide el correo, escríbele este: ${input.to}`,
+        "",
+        `También lo tienes en la plataforma, en Recursos: ${recursosUrl()}`,
+        "",
+        "Tu entrada es personal y sirve una sola vez. No la compartas.",
+        "",
+        "Con cariño,",
+        "Scarlett Córdova y Karen López",
+        "Método SK",
+      ].join("\n"),
+    });
+
+    if (error) {
+      console.error(`[email] Resend rechazó el aviso de Telegram de ${input.to}:`, error);
+      return false;
+    }
+    console.log(`[email] aviso de Telegram enviado a ${input.to} · resend_id=${data?.id ?? "?"}`);
+    return true;
+  } catch (error) {
+    console.error("[email] no se pudo enviar el aviso de Telegram:", error);
+    return false;
+  }
+}
+
+function telegramHtml(i: { saludo: string; correo: string; botUrl: string }): string {
+  return `<!doctype html>
+<html lang="es">
+  <body style="margin:0;padding:0;background:#f6f1ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f1ec;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fffdfb;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background:#191413;padding:28px 32px;">
+                <div style="color:#f3d9cf;font-size:12px;letter-spacing:.12em;text-transform:uppercase;">Método SK</div>
+                <div style="color:#fffdfb;font-size:26px;margin-top:6px;">Ya se abrió tu grupo 🎉</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 32px;">
+                <p style="margin:0 0 14px;color:#191413;font-size:16px;">${i.saludo} 💖</p>
+                <p style="margin:0 0 22px;color:#5c534c;font-size:15px;line-height:1.6;">
+                  El grupo de Telegram del reto, con <strong>Scarlett Córdova</strong> y
+                  <strong>Karen López</strong>, ya está abierto. Tu entrada es personal y
+                  te está esperando: tocas el botón, Telegram abre nuestro bot, tocas
+                  <strong>Iniciar</strong> y listo. ✨
+                </p>
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 26px;">
+                  <tr>
+                    <td align="center" style="background:#b8455a;border-radius:999px;">
+                      <a href="${i.botUrl}" style="display:inline-block;padding:16px 34px;color:#fffdfb;font-size:14px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;">
+                        Ingresa por aquí →
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f1ec;border-radius:12px;">
+                  <tr>
+                    <td style="padding:18px 20px;color:#5c534c;font-size:14px;line-height:1.6;">
+                      <strong style="color:#191413;">Si el bot te pide el correo</strong>, escríbele exactamente este:<br />
+                      <span style="display:inline-block;margin-top:6px;padding:8px 12px;background:#fffdfb;border-radius:8px;color:#191413;font-size:15px;font-weight:600;">${i.correo}</span><br />
+                      <span style="display:block;margin-top:10px;font-size:13px;color:#8a8078;">Es el correo con el que compraste. Con otro no te va a encontrar.</span>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:22px 0 0;color:#8a8078;font-size:13px;line-height:1.6;">
+                  🔑 Tu entrada sirve para una sola persona. No la compartas: si alguien más
+                  la usa, tú te quedas afuera.<br />
+                  📱 También la tienes en la plataforma, en <a href="${recursosUrl()}" style="color:#b8455a;">Recursos</a>.
+                  Y si prefieres, busca <strong>@${BOT_USERNAME}</strong> en Telegram.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 28px;color:#8a8078;font-size:13px;line-height:1.6;">
+                Con cariño,<br />
+                <strong style="color:#191413;">Scarlett Córdova &amp; Karen López</strong> 💖
+              </td>
+            </tr>
+          </table>
+          <div style="max-width:520px;margin-top:16px;color:#a39a92;font-size:12px;">
+            Recibes este correo porque compraste el reto en metodosk.ec
+          </div>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+/** Solo para mirar el correo con datos de ejemplo. No manda nada. */
+export function __previewTelegram(): string {
+  return telegramHtml({
+    saludo: "¡Hola María!",
+    correo: "maria@gmail.com",
+    botUrl: "https://t.me/metodosk_bot?start=ejemplo",
+  });
 }

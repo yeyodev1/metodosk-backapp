@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { CustomError } from "../errors/customError.error";
 import { User, IUser } from "../models/User";
 import { Order } from "../models/Order";
@@ -11,6 +12,7 @@ import {
   DefinicionGrupo,
   chatIdDe,
   telegramToken,
+  botUrl,
 } from "../config/telegram";
 
 /**
@@ -109,6 +111,19 @@ function gruposAbiertos(): DefinicionGrupo[] {
   return GRUPOS_TELEGRAM.filter((g) => chatIdDe(g));
 }
 
+/**
+ * Su llave para el bot. Se crea la primera vez que hace falta y no cambia:
+ * es lo que va en el correo y en el botón de la app, y tiene que seguir
+ * sirviendo aunque lo abra semanas después.
+ */
+export async function tokenDe(user: IUser): Promise<string> {
+  if (user.telegram?.token) return user.telegram.token;
+  const token = crypto.randomBytes(18).toString("base64url");
+  user.set("telegram.token", token);
+  await user.save();
+  return token;
+}
+
 async function beneficiosDe_(user: IUser): Promise<Beneficios> {
   const primera = await Order.findOne({ email: user.email, status: "approved" })
     .sort({ createdAt: 1 })
@@ -127,6 +142,10 @@ export interface EstadoGrupo {
 export interface EstadoTelegram {
   /** El nombre de la cuenta de Telegram vinculada, si ya pasó por el bot. */
   vinculado: string | null;
+  /** El correo que el bot espera, por si prefiere escribirlo. */
+  correo: string;
+  /** El enlace al bot con su llave: la reconoce sin pedirle nada. */
+  botUrl: string;
   grupos: EstadoGrupo[];
 }
 
@@ -140,6 +159,8 @@ export async function estado(userId: string): Promise<EstadoTelegram> {
     vinculado: user.telegram?.userId
       ? user.telegram.nombre || user.telegram.username || "tu cuenta"
       : null,
+    correo: user.email,
+    botUrl: botUrl(await tokenDe(user)),
     grupos: gruposAbiertos().map((grupo) => ({
       id: grupo.id,
       titulo: grupo.titulo,
@@ -202,6 +223,20 @@ export async function procesarUpdate(update: TelegramUpdate): Promise<void> {
 
   try {
     if (texto.startsWith("/start")) {
+      // Viene del correo o de la app con su llave: se la reconoce al toque.
+      const llave = texto.split(/\s+/)[1];
+      if (llave && llave !== "app") {
+        if (!isConnected() && !(await dbConnect())) {
+          await enviar(chatId, BOT.error);
+          return;
+        }
+        const duena = await User.findOne({ "telegram.token": llave }).select("email").lean();
+        if (duena) {
+          await enviar(chatId, BOT.bienvenidaConLlave(escapar(from.first_name || "")));
+          await responderCorreo(chatId, from, duena.email);
+          return;
+        }
+      }
       await enviar(chatId, BOT.bienvenida(escapar(from.first_name || "")));
       return;
     }

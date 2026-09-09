@@ -7,6 +7,7 @@ import { presaleCents, regularCents } from "../config/pricing";
 import { resolverChallenge } from "../helpers/challenge.helper";
 import { restaurarDesdeRespuestaOriginal } from "../services/restauracion.service";
 import { pendientesDeRecursos } from "../services/recursos.service";
+import { activarAviso, enviarTandaDeAviso, estadoAviso } from "../services/telegramAviso.service";
 import { User } from "../models/User";
 
 /** Un grupo del resumen: cuántas compras y cuánto dinero suman. */
@@ -279,6 +280,39 @@ export async function estadoRecursos(req: AuthRequest, res: Response, next: Next
     ]);
 
     res.status(200).json({ total, pendientes, enviados: total - pendientes });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * GET /api/admin/telegram — cómo va el aviso de "ya se abrió tu grupo".
+ */
+export async function estadoTelegram(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError("No pudimos conectarnos en este momento.", 503);
+    }
+    res.status(200).json(await estadoAviso());
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * POST /api/admin/telegram/avisar — la orden de avisar a todas.
+ *
+ * Deja la marca y manda la primera tanda ahí mismo, para que quien apretó el
+ * botón vea que empezó. El resto sale por el cron, una tanda por hora.
+ */
+export async function avisarTelegram(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError("No pudimos conectarnos en este momento.", 503);
+    }
+    await activarAviso();
+    const tanda = await enviarTandaDeAviso();
+    res.status(200).json({ ...tanda, estado: await estadoAviso() });
   } catch (error) {
     next(error);
   }

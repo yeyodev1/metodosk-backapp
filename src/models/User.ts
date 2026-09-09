@@ -35,6 +35,11 @@ export interface IUser extends Document {
    * es lo que impide que alguien lo reciba dos veces.
    */
   recursosEnviados: Date | null;
+  /**
+   * Cuándo se le mandó el correo de "ya se abrió tu grupo de Telegram".
+   * null = todavía no. Misma mecánica escalonada que `recursosEnviados`.
+   */
+  telegramAvisoEnviado: Date | null;
   /** Referencia de la compra que originó la cuenta. */
   clientTransactionId: string | null;
   /** true mientras siga usando la contraseña que le enviamos por correo. */
@@ -98,6 +103,12 @@ export interface IUser extends Document {
     nombre: string | null;
     username: string | null;
     vinculadoEl: Date | null;
+    /**
+     * Su llave para entrar sin escribir el correo: va en el enlace del bot
+     * (`t.me/metodosk_bot?start=<token>`) que recibe por correo y en la app.
+     * Con ella el bot la reconoce al primer toque.
+     */
+    token: string | null;
     enlaces: Partial<
       Record<"comunidad" | "premium", { enlace: string; createdAt: Date } | null>
     >;
@@ -125,6 +136,7 @@ const userSchema = new Schema<IUser>(
     challenges: { type: [String], default: [] },
     accessUntil: { type: Date, default: null },
     recursosEnviados: { type: Date, default: null },
+    telegramAvisoEnviado: { type: Date, default: null },
     clientTransactionId: { type: String, default: null },
     mustChangePassword: { type: Boolean, default: false },
     onboarding: {
@@ -166,6 +178,7 @@ const userSchema = new Schema<IUser>(
       nombre: { type: String, default: null },
       username: { type: String, default: null },
       vinculadoEl: { type: Date, default: null },
+      token: { type: String, default: null, index: true },
       enlaces: {
         comunidad: { type: { _id: false, enlace: String, createdAt: Date }, default: null },
         premium: { type: { _id: false, enlace: String, createdAt: Date }, default: null },

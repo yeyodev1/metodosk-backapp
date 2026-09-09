@@ -27,6 +27,11 @@ export const BOT = {
     `Aquí te damos la entrada a tu grupo con <b>Scarlett Córdova</b> y <b>Karen López</b> 🏋️‍♀️🥗\n\n` +
     `Escríbeme el <b>correo con el que te inscribiste en metodosk.ec</b> 📩 y te busco en un segundo.`,
 
+  /** Llegó con su llave desde el correo o la app: no hay que pedirle nada. */
+  bienvenidaConLlave: (nombre: string) =>
+    `¡Hola${nombre ? `, ${nombre}` : ""}! 💖 ¡Bienvenida al <b>Método SK</b>! ✨\n\n` +
+    `Ya sé quién eres, un segundito que te busco tu entrada… 🔎`,
+
   ayuda:
     `Esto es lo que puedo hacer por ti 💫\n\n` +
     `📩 Busco tu compra con el correo que usaste en metodosk.ec\n` +
