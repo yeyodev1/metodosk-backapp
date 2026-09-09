@@ -3,7 +3,7 @@ import { Order } from "../models/Order";
 import { Setting } from "../models/Setting";
 import { beneficiosDe } from "../config/perks";
 import { presaleDeadline } from "../config/pricing";
-import { botUrl } from "../config/telegram";
+import { botUrl, GRUPOS_TELEGRAM, chatIdDe } from "../config/telegram";
 import { sendTelegramEmail } from "../helpers/email.helper";
 import { tokenDe } from "./telegram.service";
 
@@ -75,7 +75,12 @@ interface Candidata {
 /** Todas las alumnas con lo que les toca, ordenadas por antigüedad. */
 async function candidatas(): Promise<Candidata[]> {
   const [usuarias, primeras] = await Promise.all([
-    User.find({ role: "member", email: { $ne: null } }).sort({ createdAt: 1 }),
+    // Las cuentas de prueba del bot no son alumnas: no se les escribe.
+    User.find({
+      role: "member",
+      email: { $ne: null },
+      clientTransactionId: { $not: /^PRUEBA-TELEGRAM-BOT/ },
+    }).sort({ createdAt: 1 }),
     primerasCompras(),
   ]);
   const corte = presaleDeadline();
@@ -154,4 +159,39 @@ export async function enviarTandaDeAviso(limite = POR_TANDA): Promise<ResultadoA
   }
 
   return { enviados, fallidos, pendientes: pendientes.length - enviados };
+}
+
+/**
+ * La entrada para el correo de compra de quien acaba de pagar.
+ *
+ * Devuelve su enlace con llave si el grupo ya está abierto, la administración
+ * ya dio la orden de avisar y a ella le toca; y la deja marcada como avisada
+ * para que la tanda de la hora no le mande el mismo aviso otra vez. Si algo
+ * de eso no se cumple, null: el correo de compra sale como siempre.
+ *
+ * Nunca lanza: un tropiezo acá no puede frenar el correo de la contraseña.
+ */
+export async function entradaParaCorreoDeCompra(email: string): Promise<string | null> {
+  try {
+    const hayGrupo = GRUPOS_TELEGRAM.some((g) => chatIdDe(g));
+    if (!hayGrupo || !(await avisoActivado())) return null;
+
+    const normalizado = email.toLowerCase().trim();
+    const usuaria = await User.findOne({ email: normalizado });
+    if (!usuaria) return null;
+
+    const primera = await Order.findOne({ email: normalizado, status: "approved" })
+      .sort({ createdAt: 1 })
+      .lean();
+    const { telegramIncluido } = beneficiosDe(primera?.createdAt ?? null, presaleDeadline());
+    if (!telegramIncluido) return null;
+
+    const enlace = botUrl(await tokenDe(usuaria));
+    usuaria.telegramAvisoEnviado = new Date();
+    await usuaria.save();
+    return enlace;
+  } catch (error) {
+    console.error("[telegram] no se pudo preparar la entrada para el correo de compra:", error);
+    return null;
+  }
 }

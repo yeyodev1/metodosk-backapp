@@ -47,6 +47,12 @@ export interface AccessEmailInput {
   authorizationCode?: string | null;
   /** Contraseña recién generada. Solo va en el correo de la primera compra. */
   password?: string | null;
+  /**
+   * Su enlace al bot de Telegram con llave, si el grupo ya está abierto y le
+   * toca. Con esto el correo de compra trae la entrada al grupo de una vez,
+   * en lugar de esperar el aviso escalonado.
+   */
+  telegramBotUrl?: string | null;
 }
 
 /** Dónde entra la compradora. */
@@ -120,6 +126,11 @@ function accessText(i: AccessEmailInput & { saludo: string; reto: string }): str
     "LO QUE VAS A NECESITAR",
     recursosText(),
     "",
+    i.telegramBotUrl ? "TU GRUPO DE TELEGRAM 💖" : "",
+    i.telegramBotUrl ? "Ya está abierto, con Scarlett y Karen. Entra por aquí (toca Iniciar y te reconoce sola):" : "",
+    i.telegramBotUrl ? i.telegramBotUrl : "",
+    i.telegramBotUrl ? `Si el bot te pide el correo, escríbele este: ${i.to}` : "",
+    i.telegramBotUrl ? "" : "",
     "En las próximas horas te escribimos por WhatsApp para darte la bienvenida",
     "y entregarte el plan de entrenamiento y nutrición.",
     "",
@@ -249,6 +260,8 @@ function accessHtml(i: AccessEmailInput & { saludo: string; reto: string }): str
 
                 ${recursosHtml()}
 
+                ${i.telegramBotUrl ? telegramBloqueHtml(i.to, i.telegramBotUrl) : ""}
+
                 <p style="margin:0 0 8px;color:#5c534c;font-size:15px;line-height:1.6;">
                   En las próximas horas te escribimos por WhatsApp para darte la bienvenida y
                   entregarte tu plan de entrenamiento y nutrición.
@@ -363,6 +376,28 @@ function resourcesHtml(saludo: string): string {
 }
 
 /* ── El grupo de Telegram ya está abierto ───────────────────────────────── */
+
+/**
+ * El bloque "ingresa a tu grupo", tal cual va dentro del correo de compra.
+ * Es la versión corta del correo de aviso: el mismo botón y el mismo correo
+ * exacto, sin el resto.
+ */
+function telegramBloqueHtml(correo: string, botUrl: string): string {
+  return `
+                <div style="margin:0 0 20px;padding:20px;border-radius:12px;background:#191413;">
+                  <div style="color:#f3d9cf;font-size:12px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;">Tu grupo de Telegram 💖</div>
+                  <div style="color:#fffdfb;font-size:18px;margin-bottom:8px;">Ya está abierto, con Scarlett y Karen</div>
+                  <p style="margin:0 0 14px;color:rgba(255,253,251,.75);font-size:14px;line-height:1.6;">
+                    Tu entrada es personal. Tocas el botón, se abre nuestro bot, tocas <strong style="color:#fffdfb;">Iniciar</strong> y te manda tu enlace. ✨
+                  </p>
+                  <a href="${botUrl}" style="display:block;padding:14px 20px;border-radius:999px;background:#b8455a;color:#fffdfb;font-size:14px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;text-align:center;text-decoration:none;">
+                    Ingresa por aquí →
+                  </a>
+                  <div style="margin-top:12px;color:rgba(255,253,251,.6);font-size:12px;line-height:1.6;">
+                    Si el bot te pide el correo, escríbele exactamente <strong style="color:#fffdfb;">${correo}</strong>.
+                  </div>
+                </div>`;
+}
 
 /**
  * Aviso de que ya puede entrar al grupo.

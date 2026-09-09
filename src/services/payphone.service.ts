@@ -8,6 +8,7 @@ import { ACCESS_MONTHS, isKnownAmount } from "../config/pricing";
 import { resolverChallenge } from "../helpers/challenge.helper";
 import { sendAccessEmail } from "../helpers/email.helper";
 import { ensureMember } from "./auth.service";
+import { entradaParaCorreoDeCompra } from "./telegramAviso.service";
 import { purchaseEventId, sendMetaEvent } from "./meta.service";
 
 /** Endpoint de confirmación de la Cajita de Pagos. */
@@ -210,6 +211,10 @@ export async function confirmTransaction(
         })
       : { password: null, created: false };
 
+    // Si el grupo ya está abierto y le toca, la entrada va en este mismo
+    // correo: nadie que compre hoy debería esperar a la tanda de la hora.
+    const telegramBotUrl = email ? await entradaParaCorreoDeCompra(email) : null;
+
     emailSent = await sendAccessEmail({
       to: email ?? "",
       name: datos.name ?? raw.optionalParameter4 ?? null,
@@ -219,6 +224,7 @@ export async function confirmTransaction(
       accessUntil,
       authorizationCode: raw.authorizationCode ?? null,
       password: cuenta.password,
+      telegramBotUrl,
     });
   }
 
