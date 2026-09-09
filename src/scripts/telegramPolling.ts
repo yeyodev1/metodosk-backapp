@@ -27,9 +27,13 @@ async function main() {
 
   let offset = 0;
   for (;;) {
-    const respuesta = await fetch(`${API}/getUpdates?timeout=25&offset=${offset}`).then((r) =>
-      r.json().catch(() => null),
-    );
+    // Un corte de red no tumba el bot: se espera y se vuelve a preguntar.
+    const respuesta = await fetch(`${API}/getUpdates?timeout=25&offset=${offset}`)
+      .then((r) => r.json())
+      .catch((error) => {
+        console.warn("[telegram] sin conexión, reintento en 5 s:", error.message);
+        return new Promise((resolve) => setTimeout(() => resolve(null), 5000));
+      });
     for (const update of respuesta?.result ?? []) {
       offset = update.update_id + 1;
       const texto = update.message?.text;
