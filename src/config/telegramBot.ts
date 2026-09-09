@@ -23,8 +23,8 @@ const FIRMA = `\n\nCon cariño,\n<b>Scarlett Córdova & Karen López</b> 💖`;
 
 export const BOT = {
   bienvenida: (nombre: string) =>
-    `¡Hola${nombre ? `, ${nombre}` : ""}! 💖 Bienvenida al <b>Método SK</b> ✨\n\n` +
-    `Soy la asistente de <b>Scarlett Córdova</b> y <b>Karen López</b>, y estoy aquí para darte la entrada a tu grupo 🏋️‍♀️🥗\n\n` +
+    `¡Hola${nombre ? `, ${nombre}` : ""}! 💖 ¡Bienvenida al <b>Método SK</b>! ✨\n\n` +
+    `Aquí te damos la entrada a tu grupo con <b>Scarlett Córdova</b> y <b>Karen López</b> 🏋️‍♀️🥗\n\n` +
     `Escríbeme el <b>correo con el que te inscribiste en metodosk.ec</b> 📩 y te busco en un segundo.`,
 
   ayuda:
