@@ -45,6 +45,13 @@ export interface IUser extends Document {
   /** true mientras siga usando la contraseña que le enviamos por correo. */
   mustChangePassword: boolean;
   /**
+   * El enlace de "olvidé mi contraseña", mientras está vivo.
+   *
+   * Se guarda el hash y no el token: si alguien leyera la base, no podría
+   * usarlo. Caduca solo y se borra al usarse.
+   */
+  passwordReset: { tokenHash: string; expiresAt: Date } | null;
+  /**
    * Los primeros pasos, después de comprar.
    *
    * `videoSeen` lo marca ella, no el reproductor: se le pregunta si lo vio.
@@ -139,6 +146,10 @@ const userSchema = new Schema<IUser>(
     telegramAvisoEnviado: { type: Date, default: null },
     clientTransactionId: { type: String, default: null },
     mustChangePassword: { type: Boolean, default: false },
+    passwordReset: {
+      type: new Schema({ tokenHash: String, expiresAt: Date }, { _id: false }),
+      default: null,
+    },
     onboarding: {
       videoSeen: { type: Boolean, default: false },
       photosUploaded: { type: Boolean, default: false },

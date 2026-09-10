@@ -67,3 +67,28 @@ export async function changePassword(req: AuthRequest, res: Response, next: Next
     next(error);
   }
 }
+
+/** POST /api/auth/recuperar — manda el enlace para crear contraseña nueva. */
+export async function recuperar(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { email } = req.body ?? {};
+    await authService.solicitarRecuperacion(String(email ?? ""));
+    // Siempre el mismo mensaje: no revela si el correo existe.
+    res.status(200).json({
+      mensaje: "Si ese correo tiene cuenta, te mandamos un enlace. Revisa también spam.",
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/** POST /api/auth/restablecer — la contraseña nueva, con el enlace del correo. */
+export async function restablecer(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { token, password } = req.body ?? {};
+    const result = await authService.restablecerPassword(String(token ?? ""), String(password ?? ""));
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+}

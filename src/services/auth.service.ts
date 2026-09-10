@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
+import { sendPasswordResetEmail } from "../helpers/email.helper";
 import { User, type UserRole } from "../models/User";
 import { Order } from "../models/Order";
 import { CustomError } from "../errors/customError.error";
@@ -82,6 +83,72 @@ export function generatePassword(): string {
   const alfabeto = "abcdefghijkmnpqrstuvwxyz23456789";
   const bytes = crypto.randomBytes(10);
   return Array.from(bytes, (b) => alfabeto[b % alfabeto.length]).join("");
+}
+
+/* ── Olvidé mi contraseña ─────────────────────────────────────────────── */
+
+/** Cuánto vive el enlace. Una hora alcanza para abrir el correo; más es riesgo. */
+const RESET_TTL_MS = 60 * 60 * 1000;
+
+function hashToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * Manda el enlace para crear una contraseña nueva.
+ *
+ * Responde igual exista o no la cuenta: esta pantalla no puede servir para
+ * averiguar quién compró. Si el correo no está, simplemente no sale nada.
+ */
+export async function solicitarRecuperacion(email: string): Promise<void> {
+  await requireDb();
+  const normalizado = email.toLowerCase().trim();
+  if (!EMAIL.test(normalizado)) throw new CustomError("Escribe un correo válido", 400);
+
+  const user = await User.findOne({ email: normalizado });
+  if (!user) return;
+
+  const token = crypto.randomBytes(32).toString("hex");
+  user.passwordReset = { tokenHash: hashToken(token), expiresAt: new Date(Date.now() + RESET_TTL_MS) };
+  await user.save();
+
+  const base = (process.env.SITE_URL || "https://metodosk.ec").replace(/\/$/, "");
+  await sendPasswordResetEmail({
+    to: user.email,
+    name: user.name ?? null,
+    url: `${base}/restablecer?token=${token}`,
+  });
+}
+
+/**
+ * Crea la contraseña nueva con el enlace del correo y deja la sesión abierta:
+ * quien acaba de recuperar su cuenta no debería tener que volver a escribirla.
+ */
+export async function restablecerPassword(
+  token: string,
+  password: string,
+): Promise<{ token: string; user: SessionUser }> {
+  await requireDb();
+  if (!token) throw new CustomError("El enlace no es válido", 400);
+  if (!password || password.length < MIN_PASSWORD) {
+    throw new CustomError(`La contraseña debe tener al menos ${MIN_PASSWORD} caracteres`, 400);
+  }
+
+  const user = await User.findOne({ "passwordReset.tokenHash": hashToken(token) });
+  if (!user || !user.passwordReset || user.passwordReset.expiresAt < new Date()) {
+    throw new CustomError(
+      "Este enlace ya no sirve. Pide uno nuevo desde \"Olvidé mi contraseña\".",
+      400,
+    );
+  }
+
+  user.password = await bcrypt.hash(password, 10);
+  user.passwordReset = null;
+  user.mustChangePassword = false;
+  user.lastLoginAt = new Date();
+  await user.save();
+
+  return { token: signToken(user), user: sanitize(user) };
 }
 
 export async function login(

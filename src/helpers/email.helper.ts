@@ -530,3 +530,100 @@ export function __previewTelegram(): string {
     botUrl: "https://t.me/metodosk_bot?start=ejemplo",
   });
 }
+
+/* ── Olvidé mi contraseña ─────────────────────────────────────────────── */
+
+/**
+ * El enlace para crear una contraseña nueva. Vive una hora.
+ * Nunca lanza: si el correo falla, la alumna vuelve a pedirlo.
+ */
+export async function sendPasswordResetEmail(input: {
+  to: string;
+  name?: string | null;
+  url: string;
+}): Promise<boolean> {
+  const resend = getResend();
+  if (!resend || !input.to) return false;
+
+  const firstName = (input.name || "").trim().split(/\s+/)[0] || "";
+  const saludo = firstName ? `¡Hola ${firstName}!` : "¡Hola!";
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: sender(),
+      to: input.to,
+      subject: "Crea tu nueva contraseña — Método SK",
+      html: resetHtml(saludo, input.url),
+      text: [
+        saludo,
+        "",
+        "Pediste una contraseña nueva para entrar a metodosk.ec.",
+        "Crea la nueva desde este enlace (sirve una hora):",
+        input.url,
+        "",
+        "Si no fuiste tú, ignora este correo: tu contraseña sigue igual.",
+        "",
+        "Scarlett Córdova y Karen López",
+        "Método SK",
+      ].join("\n"),
+    });
+    if (error) {
+      console.error(`[email] Resend rechazó la recuperación de ${input.to}:`, error);
+      return false;
+    }
+    console.log(`[email] recuperación enviada a ${input.to} · resend_id=${data?.id ?? "?"}`);
+    return true;
+  } catch (error) {
+    console.error("[email] no se pudo enviar la recuperación:", error);
+    return false;
+  }
+}
+
+function resetHtml(saludo: string, url: string): string {
+  return `<!doctype html>
+<html lang="es">
+  <body style="margin:0;padding:0;background:#f6f1ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f1ec;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fffdfb;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background:#191413;padding:28px 32px;">
+                <div style="color:#f3d9cf;font-size:12px;letter-spacing:.12em;text-transform:uppercase;">Método SK</div>
+                <div style="color:#fffdfb;font-size:26px;margin-top:6px;">Tu nueva contraseña 🔑</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 32px;">
+                <p style="margin:0 0 14px;color:#191413;font-size:16px;">${saludo}</p>
+                <p style="margin:0 0 22px;color:#5c534c;font-size:15px;line-height:1.6;">
+                  Pediste una contraseña nueva para entrar a metodosk.ec. Toca el botón y
+                  escribe la que quieras usar. El enlace sirve durante <strong>una hora</strong>.
+                </p>
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 22px;">
+                  <tr>
+                    <td align="center" style="background:#191413;border-radius:999px;">
+                      <a href="${url}" style="display:inline-block;padding:15px 32px;color:#fffdfb;font-size:14px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;">
+                        Crear mi contraseña
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0;color:#8a8078;font-size:13px;line-height:1.6;">
+                  Si no fuiste tú, ignora este correo: tu contraseña sigue igual.<br />
+                  Si el botón no abre, copia este enlace: <a href="${url}" style="color:#b8455a;word-break:break-all;">${url}</a>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 28px;color:#8a8078;font-size:13px;line-height:1.6;">
+                Scarlett Córdova &amp; Karen López · Método SK
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
