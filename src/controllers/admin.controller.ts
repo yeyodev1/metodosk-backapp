@@ -9,6 +9,7 @@ import { restaurarDesdeRespuestaOriginal } from "../services/restauracion.servic
 import { pendientesDeRecursos } from "../services/recursos.service";
 import { activarAviso, enviarTandaDeAviso, estadoAviso } from "../services/telegramAviso.service";
 import { User } from "../models/User";
+import { darAccesoExclusivo } from "../services/accesoExclusivo.service";
 
 /** Un grupo del resumen: cuántas compras y cuánto dinero suman. */
 interface Bucket {
@@ -313,6 +314,40 @@ export async function avisarTelegram(req: AuthRequest, res: Response, next: Next
     await activarAviso();
     const tanda = await enviarTandaDeAviso();
     res.status(200).json({ ...tanda, estado: await estadoAviso() });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * POST /api/admin/acceso-exclusivo — da acceso exclusivo VIP a una lista de
+ * correos y les manda su usuario y contraseña.
+ *
+ * Vive en el servidor y no en un script porque la llave de Resend en Vercel
+ * es secreta: desde una terminal el correo no sale. Devuelve la contraseña de
+ * cada una para que la administración pueda pasársela si el correo no llega.
+ */
+export async function accesoExclusivo(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError("No pudimos conectarnos en este momento.", 503);
+    }
+    const correos: string[] = Array.isArray(req.body?.emails)
+      ? req.body.emails.map((e: unknown) => String(e).trim()).filter(Boolean)
+      : [];
+    if (!correos.length) throw new CustomError("Escribe al menos un correo", 400);
+    if (correos.length > 20) throw new CustomError("Máximo 20 correos a la vez", 400);
+
+    // Una por una: Resend limita cuántos correos salen por segundo.
+    const resultados = [];
+    for (const correo of correos) {
+      try {
+        resultados.push({ ok: true, ...(await darAccesoExclusivo(correo)) });
+      } catch (error) {
+        resultados.push({ ok: false, email: correo, error: (error as Error).message });
+      }
+    }
+    res.status(200).json({ resultados });
   } catch (error) {
     next(error);
   }
