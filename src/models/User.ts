@@ -28,6 +28,14 @@ export interface IUser extends Document {
   /** Hasta cuándo tiene acceso. null = sin acceso vigente. */
   accessUntil: Date | null;
   /**
+   * true si el acceso se lo dio la administración y no una compra.
+   *
+   * Tiene todo lo de quien pagó en pre-venta —los dos retos y el grupo VIP—,
+   * y la app se lo muestra como "acceso exclusivo" en lugar de hablarle de
+   * un pago que no hizo.
+   */
+  accesoExclusivo: boolean;
+  /**
    * Cuándo se le mandó la lista de implementos. null = todavía no.
    *
    * Es la marca que hace el envío escalonado reanudable: el plan gratuito de
@@ -142,6 +150,7 @@ const userSchema = new Schema<IUser>(
     challenge: { type: String, default: null },
     challenges: { type: [String], default: [] },
     accessUntil: { type: Date, default: null },
+    accesoExclusivo: { type: Boolean, default: false },
     recursosEnviados: { type: Date, default: null },
     telegramAvisoEnviado: { type: Date, default: null },
     clientTransactionId: { type: String, default: null },

@@ -11,7 +11,8 @@
     "format": "prettier --write 'src/**/*.{js,jsx,ts,tsx,json,css,scss,md}'",
     "bot": "ts-node-dev --transpile-only src/scripts/telegramPolling.ts",
     "alumna-prueba": "ts-node-dev --transpile-only src/scripts/alumnaDePrueba.ts",
-    "crear-admin": "ts-node-dev --transpile-only src/scripts/crearAdmin.ts"
+    "crear-admin": "ts-node-dev --transpile-only src/scripts/crearAdmin.ts",
+    "acceso-exclusivo": "ts-node-dev --transpile-only src/scripts/accesoExclusivo.ts"
   },
   "dependencies": {
     "axios": "^1.7.9",

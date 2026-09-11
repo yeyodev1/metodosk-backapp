@@ -53,6 +53,11 @@ export interface AccessEmailInput {
    * en lugar de esperar el aviso escalonado.
    */
   telegramBotUrl?: string | null;
+  /**
+   * El acceso lo dio la administración, no una compra: el correo habla de
+   * acceso exclusivo y no muestra pago ni autorización.
+   */
+  exclusivo?: boolean;
 }
 
 /** Dónde entra la compradora. */
@@ -86,7 +91,9 @@ export async function sendAccessEmail(input: AccessEmailInput): Promise<boolean>
     const { data, error } = await resend.emails.send({
       from: sender(),
       to: input.to,
-      subject: `Tu acceso a ${reto} — Método SK`,
+      subject: input.exclusivo
+        ? "Tu acceso exclusivo a Método SK 💖"
+        : `Tu acceso a ${reto} — Método SK`,
       html: accessHtml({ ...input, saludo, reto }),
       text: accessText({ ...input, saludo, reto }),
     });
@@ -110,12 +117,14 @@ function accessText(i: AccessEmailInput & { saludo: string; reto: string }): str
   return [
     i.saludo,
     "",
-    `Tu pago quedó confirmado y ya estás dentro de ${i.reto}.`,
+    i.exclusivo
+      ? `Scarlet y Karen te dieron acceso exclusivo a ${i.reto}, con el grupo VIP incluido.`
+      : `Tu pago quedó confirmado y ya estás dentro de ${i.reto}.`,
     "",
     `Reto: ${i.reto}`,
-    `Pago: ${formatUsd(i.amountCents)} USD`,
+    i.exclusivo ? "Acceso: exclusivo · VIP" : `Pago: ${formatUsd(i.amountCents)} USD`,
     `Acceso: ${i.accessMonths} meses, hasta el ${formatDate(i.accessUntil)}`,
-    i.authorizationCode ? `Autorización: ${i.authorizationCode}` : "",
+    i.authorizationCode && !i.exclusivo ? `Autorización: ${i.authorizationCode}` : "",
     "",
     "TUS DATOS PARA ENTRAR",
     `Entra aquí: ${loginUrl()}`,
@@ -216,7 +225,9 @@ function accessHtml(i: AccessEmailInput & { saludo: string; reto: string }): str
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fffdfb;border-radius:16px;overflow:hidden;">
             <tr>
               <td style="background:#191413;padding:28px 32px;">
-                <div style="color:#f3d9cf;font-size:12px;letter-spacing:.12em;text-transform:uppercase;">Método SK · ${i.accessMonths} meses</div>
+                <div style="color:#f3d9cf;font-size:12px;letter-spacing:.12em;text-transform:uppercase;">Método SK · ${
+                  i.exclusivo ? "Acceso exclusivo" : `${i.accessMonths} meses`
+                }</div>
                 <div style="color:#fffdfb;font-size:26px;margin-top:6px;">Ya estás dentro</div>
               </td>
             </tr>
@@ -224,14 +235,18 @@ function accessHtml(i: AccessEmailInput & { saludo: string; reto: string }): str
               <td style="padding:28px 32px;">
                 <p style="margin:0 0 14px;color:#191413;font-size:16px;">${i.saludo}</p>
                 <p style="margin:0 0 20px;color:#5c534c;font-size:15px;line-height:1.6;">
-                  Tu pago quedó confirmado y tu cupo en <strong>${i.reto}</strong> está asegurado.
+                  ${
+                    i.exclusivo
+                      ? `Scarlet y Karen te dieron <strong>acceso exclusivo</strong> a <strong>${i.reto}</strong>, con el grupo VIP incluido.`
+                      : `Tu pago quedó confirmado y tu cupo en <strong>${i.reto}</strong> está asegurado.`
+                  }
                 </p>
 
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #ece4dc;border-bottom:1px solid #ece4dc;margin-bottom:20px;">
                   ${fila("Reto", i.reto)}
-                  ${fila("Pago", `${formatUsd(i.amountCents)} USD`)}
+                  ${i.exclusivo ? fila("Acceso", "Exclusivo · VIP") : fila("Pago", `${formatUsd(i.amountCents)} USD`)}
                   ${fila("Acceso hasta", formatDate(i.accessUntil))}
-                  ${i.authorizationCode ? fila("Autorización", i.authorizationCode) : ""}
+                  ${i.authorizationCode && !i.exclusivo ? fila("Autorización", i.authorizationCode) : ""}
                 </table>
 
                 <div style="margin:0 0 20px;padding:18px 20px;border-radius:12px;background:#f6f1ec;">
@@ -276,7 +291,11 @@ function accessHtml(i: AccessEmailInput & { saludo: string; reto: string }): str
             </tr>
           </table>
           <div style="max-width:520px;margin-top:16px;color:#a39a92;font-size:12px;">
-            Recibes este correo porque compraste el reto en metodosk.ec
+            ${
+              i.exclusivo
+                ? "Recibes este correo porque te dieron acceso al reto en metodosk.ec"
+                : "Recibes este correo porque compraste el reto en metodosk.ec"
+            }
           </div>
         </td>
       </tr>
