@@ -131,7 +131,7 @@ async function resumen(alumnas: Array<InstanceType<typeof User>>) {
             ? "recomposicion"
             : null,
       )
-      .filter((a): a is string => a !== null);
+      .filter((a): a is "volumen" | "recomposicion" => a !== null);
 
     if (!retos.length) sinRetoAun.push(u.email);
     else if (!u.accessUntil || u.accessUntil <= ahora) vencidas.push(u.email);
