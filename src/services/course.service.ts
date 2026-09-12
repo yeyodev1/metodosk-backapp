@@ -169,10 +169,19 @@ export async function listarParaAlumna(
   const visto = (courseId: string, lessonId: string) =>
     avance.find((a) => a.courseId === courseId && a.lessonId === lessonId);
 
+  const ahora = new Date();
+
   return cursos.map((curso) => {
     const cerradoPorMes = curso.unlockMonth > mesActual;
+    // Programado para después: para la alumna todavía no existe, aunque el
+    // material ya esté cargado y el curso marcado como publicado.
+    const esperandoFecha = Boolean(curso.publicarEl && curso.publicarEl > ahora);
     const estado: CursoParaAlumna["estado"] =
-      curso.status !== "publicado" ? "proximamente" : cerradoPorMes ? "cerrado" : "abierto";
+      curso.status !== "publicado" || esperandoFecha
+        ? "proximamente"
+        : cerradoPorMes
+          ? "cerrado"
+          : "abierto";
     const abierto = estado === "abierto";
 
     return {
@@ -237,6 +246,7 @@ export async function listarParaAdmin() {
     challenge: c.challenge,
     order: c.order,
     unlockMonth: c.unlockMonth,
+    publicarEl: c.publicarEl,
     status: c.status,
     coverPhoto: c.coverPhoto,
     welcomeVideo: c.welcomeVideo,

@@ -45,6 +45,14 @@ export interface ICourse extends Document {
   order: number;
   /** Mes del reto en que se abre: 1, 2 o 3. */
   unlockMonth: number;
+  /**
+   * Cuándo se abre, si se dejó programado. null = manda `status` y nada más.
+   *
+   * Existe para poder dejar el material cargado con días de anticipación y que
+   * se libere solo a la hora acordada, sin que nadie tenga que estar despierto
+   * apretando un botón a medianoche.
+   */
+  publicarEl: Date | null;
   /** El video con el que arranca el curso. */
   welcomeVideo: IVideo | null;
   lessons: ILesson[];
@@ -93,6 +101,7 @@ const courseSchema = new Schema<ICourse>(
     },
     order: { type: Number, default: 1, index: true },
     unlockMonth: { type: Number, default: 1, min: 1, max: 3 },
+    publicarEl: { type: Date, default: null },
     welcomeVideo: { type: videoSchema, default: null },
     lessons: { type: [lessonSchema], default: [] },
     status: {
