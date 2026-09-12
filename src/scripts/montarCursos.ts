@@ -20,6 +20,11 @@ import { estadoVideo } from "../services/bunny.service";
  * mandarle a la de volumen el de recomposición sería decirle que compre lo
  * que no necesita. Los estiramientos son los mismos para las dos.
  *
+ * "Qué necesitas" se abre de inmediato aunque el resto quede programado: dice
+ * qué comprar antes de empezar, y estrenarlo a medianoche del primer día es
+ * enterarse con las tiendas cerradas. `--abrir` solo afecta al material del
+ * reto en sí.
+ *
  *   npm run montar-cursos -- /ruta/videos-bunny.json
  *   npm run montar-cursos -- /ruta/videos-bunny.json --abrir "2026-09-14 00:00"
  */
@@ -85,9 +90,10 @@ async function main() {
     curso.coverPhoto = curso.coverPhoto || foto;
     curso.welcomeVideo = await videoDe(subido);
     curso.status = "publicado";
-    curso.publicarEl = publicarEl;
+    // Abierto ya: es lo que hay que comprar antes del primer día.
+    curso.publicarEl = null;
     await curso.save();
-    console.log(`✓ ${curso.title} (${challenge}) · ${subido.segundos}s`);
+    console.log(`✓ ${curso.title} (${challenge}) · ${subido.segundos}s · abierto ya`);
   }
 
   /* ── Los estiramientos, dentro de Movilidad ── */
@@ -124,6 +130,11 @@ async function main() {
     movilidad.status = "publicado";
     movilidad.publicarEl = publicarEl;
     await movilidad.save();
+    console.log(
+      publicarEl
+        ? `  Movilidad se abre el ${publicarEl.toLocaleString("es-EC", { timeZone: "America/Guayaquil" })}`
+        : "  Movilidad queda abierta ya",
+    );
   } else {
     console.log("— no existe el curso movilidad");
   }
