@@ -10,6 +10,12 @@ import { pendientesDeRecursos } from "../services/recursos.service";
 import { activarAviso, enviarTandaDeAviso, estadoAviso } from "../services/telegramAviso.service";
 import { User } from "../models/User";
 import { darAccesoExclusivo } from "../services/accesoExclusivo.service";
+import {
+  activarNovedad,
+  enviarTandaDeNovedad,
+  estadoNovedad,
+  guardarNovedad,
+} from "../services/novedades.service";
 
 /** Un grupo del resumen: cuántas compras y cuánto dinero suman. */
 interface Bucket {
@@ -348,6 +354,57 @@ export async function accesoExclusivo(req: AuthRequest, res: Response, next: Nex
       }
     }
     res.status(200).json({ resultados });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/* ─────────────── Novedades del reto ─────────────── */
+
+/** GET /api/admin/novedad — el aviso escrito y cómo va su envío. */
+export async function verNovedad(_req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError("No pudimos conectarnos en este momento.", 503);
+    }
+    res.status(200).json(await estadoNovedad());
+  } catch (error) {
+    next(error);
+  }
+}
+
+/** POST /api/admin/novedad — escribe o corrige el aviso, sin mandarlo. */
+export async function escribirNovedad(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError("No pudimos conectarnos en este momento.", 503);
+    }
+    await guardarNovedad({
+      titulo: String(req.body?.titulo ?? ""),
+      texto: String(req.body?.texto ?? ""),
+      ctaTexto: req.body?.ctaTexto ? String(req.body.ctaTexto) : null,
+      ctaUrl: req.body?.ctaUrl ? String(req.body.ctaUrl) : null,
+    });
+    res.status(200).json(await estadoNovedad());
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * POST /api/admin/novedad/avisar — la orden de mandarlo a todas.
+ *
+ * Manda la primera tanda ahí mismo para que quien apretó el botón vea que
+ * empezó; el resto sale por el cron, una tanda por hora.
+ */
+export async function avisarNovedad(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError("No pudimos conectarnos en este momento.", 503);
+    }
+    await activarNovedad();
+    const tanda = await enviarTandaDeNovedad();
+    res.status(200).json({ ...tanda, estado: await estadoNovedad() });
   } catch (error) {
     next(error);
   }

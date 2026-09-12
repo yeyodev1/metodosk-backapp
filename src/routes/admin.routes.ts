@@ -27,6 +27,11 @@ router.post("/telegram/avisar", adminController.avisarTelegram);
 // con su contraseña.
 router.post("/acceso-exclusivo", adminController.accesoExclusivo);
 
+// El aviso de "hay algo nuevo en tu reto": se escribe, se revisa y se manda.
+router.get("/novedad", adminController.verNovedad);
+router.post("/novedad", adminController.escribirNovedad);
+router.post("/novedad/avisar", adminController.avisarNovedad);
+
 // Cursos: la ruta del método y sus videos.
 router.get("/courses", courseController.listar);
 router.post("/courses", courseController.crear);
@@ -35,6 +40,11 @@ router.put("/courses/:id", courseController.actualizar);
 router.delete("/courses/:id", courseController.eliminar);
 router.post("/courses/:id/video", courseController.prepararVideo);
 router.get("/courses/:id/video", courseController.refrescarVideo);
+
+// Las guías en PDF: se suben firmadas y se entregan por páginas.
+router.post("/courses/:id/guia/subida", courseController.prepararGuia);
+router.put("/courses/:id/guia", courseController.guardarGuia);
+router.delete("/courses/:id/guia/:audiencia", courseController.eliminarGuia);
 router.post("/courses/:id/lessons", courseController.agregarClase);
 router.delete("/courses/:id/lessons/:lessonId", courseController.eliminarClase);
 

@@ -646,3 +646,106 @@ function resetHtml(saludo: string, url: string): string {
   </body>
 </html>`;
 }
+
+/* ─────────────── Novedades del reto ─────────────── */
+
+/**
+ * "Hay algo nuevo en tu reto", con el texto que escribió la administración.
+ *
+ * El texto llega en párrafos separados por saltos de línea y se pinta así: en
+ * un correo, un bloque de ocho líneas seguidas no se lee.
+ *
+ * Nunca lanza: un fallo de correo no puede cortar la tanda. Devuelve false y
+ * la alumna queda pendiente para la corrida siguiente.
+ */
+export async function sendNovedadEmail(input: {
+  to: string;
+  name?: string | null;
+  titulo: string;
+  texto: string;
+  ctaTexto?: string | null;
+  ctaUrl?: string | null;
+}): Promise<boolean> {
+  const resend = getResend();
+  if (!resend || !input.to) return false;
+
+  const firstName = (input.name || "").trim().split(/\s+/)[0] || "";
+  const saludo = firstName ? `¡Hola ${firstName}!` : "¡Hola!";
+  const parrafos = input.texto.split(/\n+/).map((p) => p.trim()).filter(Boolean);
+  const url = input.ctaUrl || loginUrl();
+  const cta = input.ctaTexto || "Entrar a mi cuenta";
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: sender(),
+      to: input.to,
+      subject: input.titulo,
+      html: novedadHtml({ saludo, titulo: input.titulo, parrafos, url, cta }),
+      text: [saludo, "", ...parrafos, "", `${cta}: ${url}`, "", "Scarlet Córdova y Karen López", "Método SK"].join("\n"),
+    });
+
+    if (error) {
+      console.error("[email] Resend rechazó la novedad:", error);
+      return false;
+    }
+    console.log(`[email] novedad enviada a ${input.to} · resend_id=${data?.id ?? "?"}`);
+    return true;
+  } catch (error) {
+    console.error("[email] no se pudo enviar la novedad:", error);
+    return false;
+  }
+}
+
+function novedadHtml(i: {
+  saludo: string;
+  titulo: string;
+  parrafos: string[];
+  url: string;
+  cta: string;
+}): string {
+  const escapar = (t: string) =>
+    t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  return `<!doctype html>
+<html lang="es">
+  <body style="margin:0;padding:0;background:#f6f1ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f1ec;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fffdfb;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="background:#191413;padding:28px 32px;">
+                <div style="color:#f3d9cf;font-size:12px;letter-spacing:.12em;text-transform:uppercase;">Método SK · Novedad</div>
+                <div style="color:#fffdfb;font-size:26px;margin-top:6px;">${escapar(i.titulo)}</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 32px;">
+                <p style="margin:0 0 14px;color:#191413;font-size:16px;">${i.saludo}</p>
+                ${i.parrafos
+                  .map(
+                    (p) =>
+                      `<p style="margin:0 0 14px;color:#5c534c;font-size:15px;line-height:1.6;">${escapar(p)}</p>`,
+                  )
+                  .join("")}
+                <a href="${i.url}" style="display:block;margin-top:20px;padding:13px 20px;border-radius:999px;background:#191413;color:#fffdfb;font-size:14px;font-weight:600;text-align:center;text-decoration:none;">
+                  ${escapar(i.cta)}
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 28px;color:#8a8078;font-size:13px;line-height:1.6;">
+                Scarlet Córdova · entrenamiento<br />
+                Karen López · nutrición
+              </td>
+            </tr>
+          </table>
+          <div style="max-width:520px;margin-top:16px;color:#a39a92;font-size:12px;">
+            Recibes este correo porque estás dentro del reto en metodosk.ec
+          </div>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}

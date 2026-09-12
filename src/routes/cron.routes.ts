@@ -3,6 +3,7 @@ import { dbConnect, isConnected } from "../config/mongo";
 import { CustomError } from "../errors/customError.error";
 import { enviarTandaDeRecursos } from "../services/recursos.service";
 import { enviarTandaDeAviso } from "../services/telegramAviso.service";
+import { enviarTandaDeNovedad } from "../services/novedades.service";
 
 const router = Router();
 
@@ -64,6 +65,28 @@ router.get("/telegram", soloCron, async (_req, res, next) => {
     const resultado = await enviarTandaDeAviso();
     console.log(
       `[cron] telegram: ${resultado.enviados} enviados, ${resultado.fallidos} fallidos, ${resultado.pendientes} pendientes`,
+    );
+    res.status(200).json(resultado);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/cron/novedad — la tanda del aviso "hay algo nuevo en tu reto".
+ *
+ * Hasta que la administración lo escriba y dé la orden desde el panel no
+ * manda nada. Después vacía la cola a 25 por corrida, con tope diario, para
+ * no dejar sin cuota al correo de una compra nueva.
+ */
+router.get("/novedad", soloCron, async (_req, res, next) => {
+  try {
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError("Sin base de datos", 503);
+    }
+    const resultado = await enviarTandaDeNovedad();
+    console.log(
+      `[cron] novedad: ${resultado.enviados} enviados, ${resultado.fallidos} fallidos, ${resultado.pendientes} pendientes`,
     );
     res.status(200).json(resultado);
   } catch (error) {

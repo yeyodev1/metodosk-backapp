@@ -48,6 +48,15 @@ export interface IUser extends Document {
    * null = todavía no. Misma mecánica escalonada que `recursosEnviados`.
    */
   telegramAvisoEnviado: Date | null;
+  /**
+   * Las novedades que ya se le mandaron, con la fecha.
+   *
+   * Es lo que hace reanudable el envío escalonado —igual que
+   * `recursosEnviados`— y además lo que permite que haya más de un aviso a lo
+   * largo del reto sin que el segundo le llegue a quien ya recibió el primero.
+   * La fecha se guarda porque el tope diario se mide sobre lo que salió hoy.
+   */
+  novedades: Array<{ id: string; enviadoEl: Date }>;
   /** Referencia de la compra que originó la cuenta. */
   clientTransactionId: string | null;
   /** true mientras siga usando la contraseña que le enviamos por correo. */
@@ -153,6 +162,16 @@ const userSchema = new Schema<IUser>(
     accesoExclusivo: { type: Boolean, default: false },
     recursosEnviados: { type: Date, default: null },
     telegramAvisoEnviado: { type: Date, default: null },
+    novedades: {
+      type: [
+        {
+          _id: false,
+          id: { type: String, required: true },
+          enviadoEl: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
     clientTransactionId: { type: String, default: null },
     mustChangePassword: { type: Boolean, default: false },
     passwordReset: {

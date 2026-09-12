@@ -194,3 +194,76 @@ export function urlAvatar(publicId: string | null, lado = 96): string | null {
   if (!config) return null;
   return `https://res.cloudinary.com/${config.cloudName}/image/upload/c_fill,g_face,w_${lado},h_${lado},q_auto,f_auto/${publicId}`;
 }
+
+/* ─────────────── Guías del método (PDF) ─────────────── */
+
+/**
+ * La subida de una guía.
+ *
+ * Va como `authenticated`, igual que las fotos de avance: el PDF nunca tiene
+ * una URL pública. La alumna no recibe el archivo sino sus páginas sueltas, en
+ * imagen y con su correo encima, para que un reenvío se pueda rastrear.
+ *
+ * Sube el navegador directo a Cloudinary y el servidor solo firma: son 50 MB
+ * y no caben en una función de Vercel.
+ */
+export function firmarSubidaGuia(slug: string, audiencia: string): SubidaFirmada {
+  const config = requireCloudinary();
+
+  const folder = "metodosk/guias";
+  const publicId = `${slug}-${audiencia}-${crypto.randomBytes(4).toString("hex")}`;
+  const timestamp = Math.floor(Date.now() / 1000);
+
+  const params = { folder, public_id: publicId, timestamp, type: "authenticated" };
+
+  return {
+    uploadUrl: `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`,
+    cloudName: config.cloudName,
+    apiKey: config.apiKey,
+    timestamp,
+    signature: firmar(params, config.apiSecret),
+    publicId,
+    folder,
+    type: "authenticated",
+  };
+}
+
+/**
+ * Una página de la guía, en imagen y firmada, con el correo de la alumna.
+ *
+ * `pg_N` le pide a Cloudinary que renderice esa página del PDF; el archivo
+ * entero nunca sale de ahí. La marca de agua se pone al entregar y no al
+ * subir: así una sola copia del PDF sirve para todas, y cada quien recibe la
+ * suya marcada.
+ *
+ * La firma la construye este servidor con el secreto, así que la URL no se
+ * puede fabricar desde fuera. Sí se puede reenviar una vez emitida —Cloudinary
+ * no caduca estas firmas sin token de pago—, y por eso la marca importa: lo
+ * que se reparta lleva el nombre de quien lo repartió.
+ */
+export function urlPaginaGuia(
+  publicId: string,
+  pagina: number,
+  marca: string,
+  ancho = 1400,
+): string {
+  const config = requireCloudinary();
+
+  // La coma y la barra parten la transformación: se limpian antes de firmar.
+  const texto = encodeURIComponent(marca.replace(/[,/]/g, " ").slice(0, 60));
+  const transformacion = [
+    `pg_${Math.max(1, Math.floor(pagina))},c_limit,w_${ancho},q_auto:good,f_jpg`,
+    `l_text:Arial_32_bold:${texto},co_rgb:191413,o_22,g_south_east,x_28,y_28`,
+    "fl_layer_apply",
+  ].join("/");
+
+  const firma = crypto
+    .createHash("sha1")
+    .update(`${transformacion}/${publicId}` + config.apiSecret)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .slice(0, 8);
+
+  return `https://res.cloudinary.com/${config.cloudName}/image/authenticated/s--${firma}--/${transformacion}/${publicId}`;
+}

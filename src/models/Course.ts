@@ -35,6 +35,21 @@ export interface ILesson {
   fileUrl: string | null;
 }
 
+/**
+ * Una guía en PDF, guardada en Cloudinary y entregada por páginas.
+ *
+ * Va por audiencia y no por curso porque el material de nutrición es distinto
+ * para cada reto —déficit para recomposición, superávit para volumen— y el
+ * curso que las contiene es el mismo para las dos.
+ */
+export interface IGuia {
+  audiencia: Audiencia;
+  titulo: string;
+  /** public_id en Cloudinary, tipo `authenticated`. Nunca sale al navegador. */
+  publicId: string;
+  paginas: number;
+}
+
 export interface ICourse extends Document {
   title: string;
   slug: string;
@@ -48,6 +63,8 @@ export interface ICourse extends Document {
   /** El video con el que arranca el curso. */
   welcomeVideo: IVideo | null;
   lessons: ILesson[];
+  /** Las guías que cuelgan de este curso, una por audiencia. */
+  guias: IGuia[];
   status: EstadoCurso;
   /** Foto de portada (public_id de Cloudinary). */
   coverPhoto: string | null;
@@ -95,6 +112,22 @@ const courseSchema = new Schema<ICourse>(
     unlockMonth: { type: Number, default: 1, min: 1, max: 3 },
     welcomeVideo: { type: videoSchema, default: null },
     lessons: { type: [lessonSchema], default: [] },
+    guias: {
+      type: [
+        {
+          _id: false,
+          audiencia: {
+            type: String,
+            enum: ["recomposicion", "volumen", "ambas"],
+            required: true,
+          },
+          titulo: { type: String, default: "" },
+          publicId: { type: String, required: true },
+          paginas: { type: Number, default: 1 },
+        },
+      ],
+      default: [],
+    },
     status: {
       type: String,
       enum: ["borrador", "proximamente", "publicado"],

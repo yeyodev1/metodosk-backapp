@@ -8,4 +8,7 @@ const router = Router();
 router.use(authMiddleware);
 router.get("/", courseController.misCursos);
 
+// Una página de su guía, firmada y con su correo encima.
+router.get("/:id/guia/:audiencia", courseController.guiaDeCurso);
+
 export default router;
