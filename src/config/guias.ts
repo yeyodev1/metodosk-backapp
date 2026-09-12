@@ -50,7 +50,12 @@ export interface Guia {
     ejemplo: string[];
   };
   tablas: TablaGuia[];
-  listaCompras: { nota: string; ayuda: string; categorias: string[] };
+  listaCompras: {
+    nota: string;
+    ayuda: string;
+    /** Cada categoría con sus páginas: las marcas solo existen como foto. */
+    categorias: Array<{ titulo: string; imagenes: string[] }>;
+  };
   mealPrep: Array<{ titulo: string; items: string[] }>;
   suplementos: Array<{
     nombre: string;

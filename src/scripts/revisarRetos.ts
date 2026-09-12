@@ -11,96 +11,99 @@ import { Order } from "../models/Order";
 import { User } from "../models/User";
 
 /**
- * Por qué a una alumna le sale "no lo tienes" sobre el reto que compró.
+ * Que a cada alumna le aparezca lo que compró. Todo lo que compró.
  *
- * La app decide qué material mostrarle por el nombre del reto guardado en su
- * cuenta. Si ese campo quedó vacío —la compra no lo trajo y el navegador
- * tampoco— la alumna aparece sin reto: ni el menú, ni la guía, ni el material.
- * Tiene acceso pagado y la app le ofrece comprar lo que ya compró.
+ * La app decide qué material mostrar por los retos guardados en la cuenta. Si
+ * ese campo quedó vacío —hubo compras que no lo trajeron— la alumna aparece
+ * sin reto: no ve su menú ni su guía, y encima la app le ofrece comprar lo que
+ * ya pagó. Y si compró los dos pero solo se guardó uno, le falta la mitad del
+ * material.
  *
- * Este script lo mide y, con --reparar, lo rellena desde su propia orden: el
- * reto que dice la compra o, si tampoco lo trae, el que va dentro de la
- * referencia (SK-RECOMPOSICION-...). Lo que no se pueda deducir se lista para
- * mirarlo a mano; no se inventa.
+ * Acá se reconstruye desde sus propias compras: el reto que dice cada orden
+ * aprobada o, si no lo trae, el que va dentro de la referencia
+ * (SK-RECOMPOSICION-...). Solo suma; nunca le quita un reto a nadie, porque
+ * hay accesos que se dieron a mano y no tienen una orden que los respalde.
  *
  *   npm run revisar-retos
  *   npm run revisar-retos -- --reparar
  */
+
+type Audiencia = "recomposicion" | "volumen";
+
+const audienciaDe = (reto: string): Audiencia | null => {
+  const t = reto.toLowerCase();
+  if (t.includes("volumen")) return "volumen";
+  if (t.includes("recompos")) return "recomposicion";
+  return null;
+};
+
+const retosGuardados = (u: InstanceType<typeof User>): string[] =>
+  u.challenges?.length ? u.challenges : u.challenge ? [u.challenge] : [];
+
+/** Todos los retos que respaldan sus compras aprobadas, sin repetir. */
+function retosComprados(ordenes: Array<InstanceType<typeof Order>>): string[] {
+  const retos = new Set<string>();
+  for (const o of ordenes) {
+    const reto = o.challenge || challengeDesdeTransaccion(o.clientTransactionId);
+    if (reto) retos.add(reto);
+  }
+  return [...retos];
+}
+
 async function main() {
   const reparar = process.argv.includes("--reparar");
   if (!(await dbConnect())) throw new Error("Sin base de datos");
 
   const alumnas = await User.find({ role: "member" }).sort({ createdAt: 1 });
-  const sinReto = alumnas.filter((u) => !u.challenges?.length && !u.challenge);
+  const aprobadas = await Order.find({ status: "approved" }).sort({ createdAt: 1 });
 
-  console.log(`alumnas: ${alumnas.length} · sin reto asignado: ${sinReto.length}`);
+  const porCorreo = new Map<string, Array<InstanceType<typeof Order>>>();
+  for (const o of aprobadas) {
+    if (!o.email) continue;
+    const correo = o.email.toLowerCase();
+    porCorreo.set(correo, [...(porCorreo.get(correo) ?? []), o]);
+  }
 
-  // Qué nombres de reto existen hoy, para detectar variantes escritas distinto.
-  const nombres = new Map<string, number>();
+  const faltantes: Array<{ u: InstanceType<typeof User>; suma: string[]; tiene: string[] }> = [];
+  const sinRespaldo: string[] = [];
+
   for (const u of alumnas) {
-    for (const c of u.challenges?.length ? u.challenges : u.challenge ? [u.challenge] : []) {
-      nombres.set(c, (nombres.get(c) ?? 0) + 1);
-    }
-  }
-  console.log("\nretos guardados en las cuentas:");
-  for (const [nombre, n] of [...nombres].sort((a, b) => b[1] - a[1])) {
-    console.log(`  ${n.toString().padStart(3)} × "${nombre}"`);
-  }
+    const tiene = retosGuardados(u);
+    const comprados = retosComprados(porCorreo.get(u.email.toLowerCase()) ?? []);
+    const suma = comprados.filter((r) => !tiene.includes(r));
 
-  await resumen(alumnas);
-
-  if (!sinReto.length) {
-    await mongoose.disconnect();
-    return;
+    if (suma.length) faltantes.push({ u, suma, tiene });
+    else if (!tiene.length) sinRespaldo.push(u.email);
   }
 
-  console.log("\nlas que no tienen reto:");
-  let arreglables = 0;
-  const cambios: Array<{ user: (typeof sinReto)[number]; reto: string; origen: string }> = [];
+  console.log(`alumnas: ${alumnas.length}`);
+  console.log(`a las que les falta algún reto de su compra: ${faltantes.length}`);
 
-  for (const u of sinReto) {
-    const ordenes = await Order.find({ email: u.email, status: "approved" }).sort({ createdAt: 1 });
-    let reto: string | null = null;
-    let origen = "";
+  for (const { u, suma, tiene } of faltantes) {
+    const antes = tiene.length ? tiene.join(" + ") : "nada";
+    console.log(`  ${u.email}: tenía ${antes} → le suma ${suma.join(" + ")}`);
+  }
 
-    for (const o of ordenes) {
-      if (o.challenge) {
-        reto = o.challenge;
-        origen = "su compra";
-        break;
+  if (sinRespaldo.length) {
+    console.log(`\nsin reto y sin compra que lo diga (mirar a mano): ${sinRespaldo.length}`);
+    for (const correo of sinRespaldo) console.log(`  ${correo}`);
+  }
+
+  if (reparar && faltantes.length) {
+    for (const { u, suma } of faltantes) {
+      for (const reto of suma) {
+        if (!u.challenges.includes(reto)) u.challenges.push(reto);
       }
-      const deReferencia = challengeDesdeTransaccion(o.clientTransactionId);
-      if (deReferencia) {
-        reto = deReferencia;
-        origen = `la referencia ${o.clientTransactionId}`;
-        break;
-      }
+      // `challenge` es el que la app enseña como "tu reto": el último comprado.
+      u.challenge = u.challenges[u.challenges.length - 1] ?? u.challenge;
+      await u.save();
     }
-
-    if (reto) {
-      arreglables++;
-      cambios.push({ user: u, reto, origen });
-      console.log(`  ${u.email} → ${reto} (según ${origen})`);
-    } else {
-      console.log(`  ${u.email} → NO SE PUEDE DEDUCIR (${ordenes.length} órdenes aprobadas)`);
-    }
-  }
-
-  console.log(`\ndeducibles: ${arreglables} de ${sinReto.length}`);
-
-  if (!reparar) {
+    console.log(`\nreparadas ${faltantes.length} cuentas`);
+  } else if (faltantes.length) {
     console.log("\n(nada se tocó — corre con --reparar para aplicarlo)");
-    await mongoose.disconnect();
-    return;
   }
 
-  for (const { user, reto } of cambios) {
-    user.challenge = reto;
-    if (!user.challenges.includes(reto)) user.challenges.push(reto);
-    await user.save();
-  }
-  console.log(`\nreparadas ${cambios.length} cuentas`);
-
+  await resumen(reparar ? await User.find({ role: "member" }) : alumnas);
   await mongoose.disconnect();
 }
 
@@ -108,7 +111,7 @@ async function main() {
  * Cuántas alumnas ven su guía ahora mismo, y qué le falta a cada una que no.
  *
  * Son tres cosas y solo tres: tener el reto guardado, tener el acceso vigente
- * y que exista la guía de su reto. Se cuentan juntas porque la pregunta real
+ * y que exista la guía de ese reto. Se cuentan juntas porque la pregunta real
  * —"¿ya le aparece a todas?"— no se responde mirando una sola.
  */
 async function resumen(alumnas: Array<InstanceType<typeof User>>) {
@@ -116,44 +119,47 @@ async function resumen(alumnas: Array<InstanceType<typeof User>>) {
   const ahora = new Date();
 
   let ven = 0;
-  const sinRetoAun: string[] = [];
+  let conLasDos = 0;
+  const sinReto: string[] = [];
   const vencidas: string[] = [];
   const sinGuia: string[] = [];
   const nuncaEntraron: string[] = [];
 
   for (const u of alumnas) {
-    const retos = u.challenges?.length ? u.challenges : u.challenge ? [u.challenge] : [];
-    const audiencias = retos
-      .map((r) =>
-        r.toLowerCase().includes("volumen")
-          ? "volumen"
-          : r.toLowerCase().includes("recompos")
-            ? "recomposicion"
-            : null,
-      )
-      .filter((a): a is "volumen" | "recomposicion" => a !== null);
+    const retos = retosGuardados(u);
+    const audiencias = [
+      ...new Set(retos.map(audienciaDe).filter((a): a is Audiencia => a !== null)),
+    ];
 
-    if (!retos.length) sinRetoAun.push(u.email);
+    if (!retos.length) sinReto.push(u.email);
     else if (!u.accessUntil || u.accessUntil <= ahora) vencidas.push(u.email);
     else if (!audiencias.some((a) => cargadas.has(a))) sinGuia.push(u.email);
     else {
       ven++;
+      if (audiencias.length > 1) conLasDos++;
       if (!u.lastLoginAt) nuncaEntraron.push(u.email);
     }
   }
 
   console.log(`\n── ¿a quién le aparece su guía? ──`);
   console.log(`  ${ven} de ${alumnas.length} la tienen disponible`);
-  if (sinRetoAun.length) console.log(`  ${sinRetoAun.length} sin reto asignado`);
+  console.log(`  ${conLasDos} de ellas ven las dos guías, por tener los dos retos`);
+  if (sinReto.length) console.log(`  ${sinReto.length} sin reto asignado`);
   if (vencidas.length) console.log(`  ${vencidas.length} con el acceso vencido`);
   if (sinGuia.length) console.log(`  ${sinGuia.length} sin guía cargada para su reto`);
+
   if (nuncaEntraron.length) {
     console.log(
-      `\n  ojo: ${nuncaEntraron.length} de las que la tienen disponible NUNCA han iniciado sesión.`,
+      `\n  ojo: ${nuncaEntraron.length} de las que la tienen disponible nunca han iniciado sesión.`,
     );
-    console.log(`  A ellas no les "falla" nada: todavía no han entrado a la app.`);
+    console.log(`  A ellas no les falla nada: todavía no han entrado a la app.`);
   }
-  for (const [titulo, lista] of [["sin reto", sinRetoAun], ["vencidas", vencidas], ["sin guía", sinGuia]] as const) {
+
+  for (const [titulo, lista] of [
+    ["sin reto", sinReto],
+    ["vencidas", vencidas],
+    ["sin guía", sinGuia],
+  ] as const) {
     if (lista.length) console.log(`\n  ${titulo}: ${lista.join(", ")}`);
   }
 }
