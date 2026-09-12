@@ -3,6 +3,7 @@ import paymentRouter from "./payment.routes";
 import authRouter from "./auth.routes";
 import adminRouter from "./admin.routes";
 import courseRouter from "./course.routes";
+import guiasRouter from "./guias.routes";
 import settingsRouter from "./settings.routes";
 import progressRouter from "./progress.routes";
 import commentRouter from "./comment.routes";
@@ -20,6 +21,7 @@ function routerApi(app: Application) {
   router.use("/auth", authRouter);
   router.use("/admin", adminRouter);
   router.use("/courses", courseRouter);
+  router.use("/guias", guiasRouter);
   router.use("/settings", settingsRouter);
   router.use("/progress", progressRouter);
   router.use("/comments", commentRouter);

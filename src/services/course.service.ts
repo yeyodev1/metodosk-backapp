@@ -4,7 +4,6 @@ import { Progress } from "../models/Progress";
 import { CustomError } from "../errors/customError.error";
 import { dbConnect, isConnected } from "../config/mongo";
 import { bunnyConfig, crearSubida, estadoVideo, borrarVideo, urlEmbed } from "./bunny.service";
-import { borrarImagen, urlPaginaGuia } from "./cloudinary.service";
 
 async function requireDb(): Promise<void> {
   if (isConnected()) return;
@@ -125,11 +124,6 @@ export interface CursoParaAlumna {
   challenge: Audiencia;
   /** 'abierto' | 'proximamente' | 'cerrado-por-mes' */
   estado: "abierto" | "proximamente" | "cerrado";
-  /**
-   * Las guías que le tocan, sin el public_id: la alumna pide sus páginas por
-   * número contra nuestro API y nunca ve dónde vive el archivo.
-   */
-  guias: Array<{ audiencia: Audiencia; titulo: string; paginas: number }>;
   welcomeVideo: { embedUrl: string; thumbnail: string | null; completed: boolean } | null;
   lessons: Array<{
     id: string;
@@ -224,99 +218,8 @@ export async function listarParaAlumna(
             completed: Boolean(suyo?.completed),
           };
         }),
-      // La guía de su reto. La de la otra no se le nombra siquiera: no le
-      // sirve y le diría que compre el plan contrario al que está haciendo.
-      guias: abierto
-        ? (curso.guias || [])
-            .filter(
-              (g) =>
-                g.audiencia === "ambas" ||
-                audiencias.length === 0 ||
-                audiencias.includes(g.audiencia),
-            )
-            .map((g) => ({ audiencia: g.audiencia, titulo: g.titulo, paginas: g.paginas }))
-        : [],
     };
   });
-}
-
-/**
- * La URL firmada de una página de la guía, para esta alumna.
- *
- * Se comprueba todo de nuevo acá y no se confía en lo que pida el navegador:
- * que el curso esté abierto, que la guía sea de su reto y que la página exista.
- * Sin esto, cambiar un número en la URL entregaría la guía del otro plan.
- */
-export async function guiaParaAlumna(
-  userId: string,
-  courseId: string,
-  audiencia: string,
-  mesActual: number,
-): Promise<{ titulo: string; paginas: number; urls: string[] }> {
-  await requireDb();
-
-  const user = await User.findById(userId);
-  if (!user) throw new CustomError("Cuenta no encontrada", 404);
-
-  const curso = await Course.findById(courseId).lean();
-  if (!curso) throw new CustomError("No encontramos esa guía", 404);
-  if (curso.status !== "publicado" || curso.unlockMonth > mesActual) {
-    throw new CustomError("Esta guía todavía no está abierta", 403);
-  }
-
-  const suyas = audienciasDe(user);
-  const guia = (curso.guias || []).find((g) => g.audiencia === audiencia);
-  if (!guia) throw new CustomError("No encontramos esa guía", 404);
-  if (guia.audiencia !== "ambas" && suyas.length && !suyas.includes(guia.audiencia)) {
-    throw new CustomError("Esa guía es del otro reto", 403);
-  }
-
-  /**
-   * Se firman todas las páginas de una vez y no una por una.
-   *
-   * Un `<img>` no puede mandar la cabecera de sesión, así que la alternativa
-   * sería que el navegador pidiera cada página por separado y las armara como
-   * blob: setenta y una peticiones autenticadas para leer un documento. La
-   * marca de agua con su correo es lo que protege el material, no que la URL
-   * esté escondida.
-   */
-  const urls = Array.from({ length: guia.paginas }, (_, i) =>
-    urlPaginaGuia(guia.publicId, i + 1, user.email),
-  );
-
-  return { titulo: guia.titulo, paginas: guia.paginas, urls };
-}
-
-/* ─────────────── Guías, desde el panel ─────────────── */
-
-/** Guarda la guía recién subida en el curso, o reemplaza la de esa audiencia. */
-export async function guardarGuia(
-  courseId: string,
-  guia: { audiencia: Audiencia; titulo: string; publicId: string; paginas: number },
-): Promise<void> {
-  await requireDb();
-  const curso = await Course.findById(courseId);
-  if (!curso) throw new CustomError("No encontramos el curso", 404);
-
-  const anterior = curso.guias.find((g) => g.audiencia === guia.audiencia);
-  curso.guias = [...curso.guias.filter((g) => g.audiencia !== guia.audiencia), guia];
-  await curso.save();
-
-  // El PDF viejo se borra: es material que ya no se entrega y ocupa igual.
-  if (anterior && anterior.publicId !== guia.publicId) {
-    await borrarImagen(anterior.publicId, "authenticated").catch(() => {});
-  }
-}
-
-export async function borrarGuia(courseId: string, audiencia: string): Promise<void> {
-  await requireDb();
-  const curso = await Course.findById(courseId);
-  if (!curso) throw new CustomError("No encontramos el curso", 404);
-
-  const guia = curso.guias.find((g) => g.audiencia === audiencia);
-  curso.guias = curso.guias.filter((g) => g.audiencia !== audiencia);
-  await curso.save();
-  if (guia) await borrarImagen(guia.publicId, "authenticated").catch(() => {});
 }
 
 /* ─────────────── Administración ─────────────── */

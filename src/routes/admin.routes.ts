@@ -40,11 +40,6 @@ router.put("/courses/:id", courseController.actualizar);
 router.delete("/courses/:id", courseController.eliminar);
 router.post("/courses/:id/video", courseController.prepararVideo);
 router.get("/courses/:id/video", courseController.refrescarVideo);
-
-// Las guías en PDF: se suben firmadas y se entregan por páginas.
-router.post("/courses/:id/guia/subida", courseController.prepararGuia);
-router.put("/courses/:id/guia", courseController.guardarGuia);
-router.delete("/courses/:id/guia/:audiencia", courseController.eliminarGuia);
 router.post("/courses/:id/lessons", courseController.agregarClase);
 router.delete("/courses/:id/lessons/:lessonId", courseController.eliminarClase);
 
