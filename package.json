@@ -17,7 +17,8 @@
     "publicar-guias": "ts-node-dev --transpile-only src/scripts/publicarGuias.ts",
     "revisar-retos": "ts-node-dev --transpile-only src/scripts/revisarRetos.ts",
     "revisar-alumna": "ts-node-dev --transpile-only src/scripts/revisarAlumna.ts",
-    "programar-curso": "ts-node-dev --transpile-only src/scripts/programarCurso.ts"
+    "programar-curso": "ts-node-dev --transpile-only src/scripts/programarCurso.ts",
+    "montar-cursos": "ts-node-dev --transpile-only src/scripts/montarCursos.ts"
   },
   "dependencies": {
     "axios": "^1.7.9",
