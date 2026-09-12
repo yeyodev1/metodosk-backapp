@@ -154,7 +154,9 @@ export async function listarParaAlumna(
   const user = await User.findById(userId);
   if (!user) throw new CustomError("Cuenta no encontrada", 404);
 
-  const audiencias = audienciasDe(user);
+  // La administración ve el material de los dos retos: es suyo. Sin esto,
+  // revisar la app "como alumna" escondía la mitad del método.
+  const audiencias = user.role === "admin" ? [] : audienciasDe(user);
   const query: Record<string, unknown> = { status: { $in: ["publicado", "proximamente"] } };
   if (audiencias.length) query.challenge = { $in: [...audiencias, "ambas"] };
 
