@@ -50,18 +50,19 @@ export interface Guia {
     ejemplo: string[];
   };
   tablas: TablaGuia[];
-  listaCompras: {
-    nota: string;
-    ayuda: string;
-    /** Cada categoría con sus páginas: las marcas solo existen como foto. */
-    categorias: Array<{ titulo: string; imagenes: string[] }>;
-  };
+  listaCompras: { nota: string; ayuda: string; categorias: string[] };
   mealPrep: Array<{ titulo: string; items: string[] }>;
   suplementos: Array<{
     nombre: string;
     paraQuien: string[];
     cuando: string;
     precaucion: string;
+    /** Dónde se consigue: Amazon, Fybeca, Al Peso… */
+    dondeComprar: string[];
+    /** La página del PDF con las marcas: ahí el dato son las fotos. */
+    imagenes: string[];
   }>;
+  /** El recetario en video, que las comidas citan todo el tiempo. */
+  recetario: string;
 }
 
