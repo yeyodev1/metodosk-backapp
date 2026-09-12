@@ -6,6 +6,7 @@ dotenv.config({ path: [".env.local", ".env"] });
 import mongoose from "mongoose";
 import { dbConnect } from "../config/mongo";
 import { challengeDesdeTransaccion } from "../helpers/challenge.helper";
+import { Guia } from "../models/Guia";
 import { Order } from "../models/Order";
 import { User } from "../models/User";
 
@@ -45,6 +46,8 @@ async function main() {
   for (const [nombre, n] of [...nombres].sort((a, b) => b[1] - a[1])) {
     console.log(`  ${n.toString().padStart(3)} × "${nombre}"`);
   }
+
+  await resumen(alumnas);
 
   if (!sinReto.length) {
     await mongoose.disconnect();
@@ -99,6 +102,60 @@ async function main() {
   console.log(`\nreparadas ${cambios.length} cuentas`);
 
   await mongoose.disconnect();
+}
+
+/**
+ * Cuántas alumnas ven su guía ahora mismo, y qué le falta a cada una que no.
+ *
+ * Son tres cosas y solo tres: tener el reto guardado, tener el acceso vigente
+ * y que exista la guía de su reto. Se cuentan juntas porque la pregunta real
+ * —"¿ya le aparece a todas?"— no se responde mirando una sola.
+ */
+async function resumen(alumnas: Array<InstanceType<typeof User>>) {
+  const cargadas = new Set((await Guia.find().lean()).map((g) => g.audiencia));
+  const ahora = new Date();
+
+  let ven = 0;
+  const sinRetoAun: string[] = [];
+  const vencidas: string[] = [];
+  const sinGuia: string[] = [];
+  const nuncaEntraron: string[] = [];
+
+  for (const u of alumnas) {
+    const retos = u.challenges?.length ? u.challenges : u.challenge ? [u.challenge] : [];
+    const audiencias = retos
+      .map((r) =>
+        r.toLowerCase().includes("volumen")
+          ? "volumen"
+          : r.toLowerCase().includes("recompos")
+            ? "recomposicion"
+            : null,
+      )
+      .filter((a): a is string => a !== null);
+
+    if (!retos.length) sinRetoAun.push(u.email);
+    else if (!u.accessUntil || u.accessUntil <= ahora) vencidas.push(u.email);
+    else if (!audiencias.some((a) => cargadas.has(a))) sinGuia.push(u.email);
+    else {
+      ven++;
+      if (!u.lastLoginAt) nuncaEntraron.push(u.email);
+    }
+  }
+
+  console.log(`\n── ¿a quién le aparece su guía? ──`);
+  console.log(`  ${ven} de ${alumnas.length} la tienen disponible`);
+  if (sinRetoAun.length) console.log(`  ${sinRetoAun.length} sin reto asignado`);
+  if (vencidas.length) console.log(`  ${vencidas.length} con el acceso vencido`);
+  if (sinGuia.length) console.log(`  ${sinGuia.length} sin guía cargada para su reto`);
+  if (nuncaEntraron.length) {
+    console.log(
+      `\n  ojo: ${nuncaEntraron.length} de las que la tienen disponible NUNCA han iniciado sesión.`,
+    );
+    console.log(`  A ellas no les "falla" nada: todavía no han entrado a la app.`);
+  }
+  for (const [titulo, lista] of [["sin reto", sinRetoAun], ["vencidas", vencidas], ["sin guía", sinGuia]] as const) {
+    if (lista.length) console.log(`\n  ${titulo}: ${lista.join(", ")}`);
+  }
 }
 
 main().catch((e) => {
