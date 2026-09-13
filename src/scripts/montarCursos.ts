@@ -80,12 +80,18 @@ async function main() {
   const subidos = JSON.parse(readFileSync(ruta, "utf-8")) as Record<string, VideoSubido>;
 
   /* ── "Qué necesitas", uno por reto ── */
-  const porReto: Array<{ clave: string; slug: string; challenge: "recomposicion" | "volumen"; foto: string }> = [
-    { clave: "necesitas-recomposicion", slug: "que-necesitas-recomposicion", challenge: "recomposicion", foto: "metodosk/sk-07" },
-    { clave: "necesitas-volumen", slug: "que-necesitas-volumen", challenge: "volumen", foto: "metodosk/sk-06" },
+  const porReto: Array<{
+    clave: string;
+    slug: string;
+    challenge: "recomposicion" | "volumen";
+    reto: string;
+    foto: string;
+  }> = [
+    { clave: "necesitas-recomposicion", slug: "que-necesitas-recomposicion", challenge: "recomposicion", reto: "SK Recomposición", foto: "metodosk/sk-07" },
+    { clave: "necesitas-volumen", slug: "que-necesitas-volumen", challenge: "volumen", reto: "SK Volumen", foto: "metodosk/sk-06" },
   ];
 
-  for (const { clave, slug, challenge, foto } of porReto) {
+  for (const { clave, slug, challenge, reto, foto } of porReto) {
     const subido = subidos[clave];
     if (!subido) {
       console.log(`— falta el video ${clave}, se salta`);
@@ -96,7 +102,9 @@ async function main() {
       (await Course.findOne({ slug })) ??
       new Course({ slug, challenge, coverPhoto: foto });
 
-    curso.title = "Qué necesitas para entrenar";
+    // El reto va en el título y no en una etiqueta: dos cursos con el mismo
+    // nombre, distinguidos por un chip pequeño, se leen como un duplicado.
+    curso.title = `Qué necesitas · ${reto}`;
     curso.summary = "Lo que hay que tener listo antes del primer día. Dura un minuto.";
     curso.challenge = challenge;
     curso.order = 1;
