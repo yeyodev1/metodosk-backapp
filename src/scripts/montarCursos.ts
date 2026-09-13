@@ -52,11 +52,25 @@ async function videoDe(subido: VideoSubido) {
 
 async function main() {
   const args = process.argv.slice(2);
-  const ruta = args.find((a) => !a.startsWith("--"));
+  // El JSON es el primer argumento suelto; lo que va tras --abrir es la fecha.
+  const corte = args.indexOf("--abrir");
+  const ruta = (corte >= 0 ? args.slice(0, corte) : args).find((a) => !a.startsWith("--"));
   if (!ruta) throw new Error("Uso: montar-cursos /ruta/videos-bunny.json [--abrir \"2026-09-14 00:00\"]");
 
+  /**
+   * La fecha puede llegar partida en dos: la terminal separa "2026-09-14
+   * 00:00" en cuanto se pierden las comillas. Se juntan todos los trozos que
+   * siguen a --abrir hasta la próxima opción.
+   */
   const i = args.indexOf("--abrir");
-  const cuando = i >= 0 ? args[i + 1] : null;
+  const cuando =
+    i >= 0
+      ? args
+          .slice(i + 1)
+          .filter((a) => !a.startsWith("--"))
+          .join(" ")
+          .trim() || null
+      : null;
   const publicarEl = cuando ? new Date(cuando.replace(" ", "T") + ZONA) : null;
   if (cuando && Number.isNaN(publicarEl!.getTime())) {
     throw new Error(`No entendí la fecha "${cuando}". Usa: "2026-09-14 00:00"`);
