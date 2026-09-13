@@ -124,6 +124,13 @@ export interface CursoParaAlumna {
   challenge: Audiencia;
   /** 'abierto' | 'proximamente' | 'cerrado-por-mes' */
   estado: "abierto" | "proximamente" | "cerrado";
+  /**
+   * Cuándo se abre, si está programado y todavía no llegó la fecha.
+   *
+   * "Aún no disponible" no dice nada: con la fecha, la alumna sabe si volver
+   * esta noche o la semana que viene.
+   */
+  abreEl: string | null;
   welcomeVideo: { embedUrl: string; thumbnail: string | null; completed: boolean } | null;
   lessons: Array<{
     id: string;
@@ -201,6 +208,8 @@ export async function listarParaAlumna(
       coverPhoto: curso.coverPhoto,
       challenge: curso.challenge,
       estado,
+      abreEl:
+        curso.publicarEl && curso.publicarEl > ahora ? curso.publicarEl.toISOString() : null,
       welcomeVideo:
         abierto && curso.welcomeVideo?.bunnyId && hayBunny
           ? {
