@@ -105,7 +105,14 @@ async function main() {
     foto: string;
   }> = [
     { clave: "necesitas-recomposicion", slug: "que-necesitas-recomposicion", challenge: "recomposicion", reto: "SK Recomposición", foto: "metodosk/sk-07" },
-    { clave: "necesitas-volumen", slug: "que-necesitas-volumen", challenge: "volumen", reto: "SK Volumen", foto: "metodosk/sk-06" },
+    {
+      clave: "necesitas-volumen",
+      slug: "que-necesitas-volumen",
+      challenge: "volumen",
+      reto: "SK Volumen",
+      // URL completa: vive en la cuenta de las alumnas, no en la del shoot.
+      foto: "https://res.cloudinary.com/kr8lmvcf/image/upload/c_fill,g_auto,w_720,q_auto,f_auto/metodosk/cursos/que-necesitas-volumen",
+    },
   ];
 
   for (const { clave, slug, challenge, reto, foto } of porReto) {
@@ -126,7 +133,7 @@ async function main() {
     curso.challenge = challenge;
     curso.order = 1;
     curso.unlockMonth = 1;
-    curso.coverPhoto = curso.coverPhoto || foto;
+    curso.coverPhoto = foto;
     curso.welcomeVideo = await videoDe(subido);
     curso.notas = [NOTA_PESOS];
     curso.status = "publicado";
