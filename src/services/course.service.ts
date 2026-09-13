@@ -173,9 +173,16 @@ export async function listarParaAlumna(
 
   return cursos.map((curso) => {
     const cerradoPorMes = curso.unlockMonth > mesActual;
-    // Programado para después: para la alumna todavía no existe, aunque el
-    // material ya esté cargado y el curso marcado como publicado.
-    const esperandoFecha = Boolean(curso.publicarEl && curso.publicarEl > ahora);
+    /*
+     * Programado para después: para la alumna todavía no existe, aunque el
+     * material ya esté cargado y el curso marcado como publicado.
+     *
+     * La administración sí lo ve: si no, no habría forma de revisar que las
+     * clases quedaron bien antes de que se abran solas a medianoche, que es
+     * justo cuando ya no hay nadie para arreglarlo.
+     */
+    const esperandoFecha =
+      user.role !== "admin" && Boolean(curso.publicarEl && curso.publicarEl > ahora);
     const estado: CursoParaAlumna["estado"] =
       curso.status !== "publicado" || esperandoFecha
         ? "proximamente"
