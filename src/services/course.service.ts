@@ -133,6 +133,8 @@ export interface CursoParaAlumna {
   abreEl: string | null;
   /** Texto del curso: se lee dentro, debajo del video. */
   notas: Array<{ titulo: string; cuerpo: string[] }>;
+  /** A dónde lleva, si el curso es una puerta a otra pantalla. */
+  enlace: string | null;
   welcomeVideo: { embedUrl: string; thumbnail: string | null; completed: boolean } | null;
   lessons: Array<{
     id: string;
@@ -192,8 +194,9 @@ export async function listarParaAlumna(
      */
     const esperandoFecha =
       user.role !== "admin" && Boolean(curso.publicarEl && curso.publicarEl > ahora);
-    const estado: CursoParaAlumna["estado"] =
-      curso.status !== "publicado" || esperandoFecha
+    const estado: CursoParaAlumna["estado"] = curso.enlace
+      ? "abierto"
+      : curso.status !== "publicado" || esperandoFecha
         ? "proximamente"
         : cerradoPorMes
           ? "cerrado"
@@ -213,6 +216,7 @@ export async function listarParaAlumna(
       abreEl:
         curso.publicarEl && curso.publicarEl > ahora ? curso.publicarEl.toISOString() : null,
       notas: abierto ? (curso.notas ?? []) : [],
+      enlace: curso.enlace ?? null,
       welcomeVideo:
         abierto && curso.welcomeVideo?.bunnyId && hayBunny
           ? {

@@ -70,6 +70,13 @@ export interface ICourse extends Document {
   lessons: ILesson[];
   /** Texto que se lee dentro del curso, debajo del video. */
   notas: INota[];
+  /**
+   * A dónde lleva, si este curso es una puerta y no un contenedor.
+   *
+   * "La comunidad" no tiene videos: es el muro, que ya tiene su pantalla. Sin
+   * esto había que dejarla como curso vacío prometiendo material que no existe.
+   */
+  enlace: string | null;
   status: EstadoCurso;
   /** Foto de portada (public_id de Cloudinary). */
   coverPhoto: string | null;
@@ -118,6 +125,7 @@ const courseSchema = new Schema<ICourse>(
     publicarEl: { type: Date, default: null },
     welcomeVideo: { type: videoSchema, default: null },
     lessons: { type: [lessonSchema], default: [] },
+    enlace: { type: String, default: null },
     notas: {
       type: [
         {

@@ -179,6 +179,17 @@ async function main() {
     console.log("— no existe el curso movilidad");
   }
 
+  /* ── "La comunidad" es una puerta al muro, no un curso con videos ── */
+  const comunidad = await Course.findOne({ slug: "comunidad" });
+  if (comunidad) {
+    comunidad.enlace = "/comunidad";
+    comunidad.summary = "El muro de todas las que están haciendo el reto. Preséntate y cuenta cómo vas.";
+    comunidad.status = "publicado";
+    comunidad.publicarEl = null;
+    await comunidad.save();
+    console.log("✓ La comunidad · lleva al muro");
+  }
+
   /* ── El orden de la ruta: "qué necesitas" va primero ── */
   const despues = ["movilidad", "entrenamiento", "nutricion", "masterclasses", "comunidad"];
   for (const [posicion, slug] of despues.entries()) {
