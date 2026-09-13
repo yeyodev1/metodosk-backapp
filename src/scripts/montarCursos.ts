@@ -104,7 +104,13 @@ async function main() {
     reto: string;
     foto: string;
   }> = [
-    { clave: "necesitas-recomposicion", slug: "que-necesitas-recomposicion", challenge: "recomposicion", reto: "SK Recomposición", foto: "metodosk/sk-07" },
+    {
+      clave: "necesitas-recomposicion",
+      slug: "que-necesitas-recomposicion",
+      challenge: "recomposicion",
+      reto: "SK Recomposición",
+      foto: "https://res.cloudinary.com/kr8lmvcf/image/upload/c_fill,g_auto,w_720,q_auto,f_auto/metodosk/cursos/que-necesitas-volumen",
+    },
     {
       clave: "necesitas-volumen",
       slug: "que-necesitas-volumen",
