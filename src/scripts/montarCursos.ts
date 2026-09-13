@@ -30,6 +30,23 @@ import { estadoVideo } from "../services/bunny.service";
  */
 const ZONA = "-05:00";
 
+/**
+ * Qué peso usar, lo escribió Scarlet.
+ *
+ * Va dentro de "Qué necesitas" y no en otra pantalla: la pregunta aparece
+ * justo cuando la alumna está viendo con qué va a entrenar.
+ */
+const NOTA_PESOS = {
+  titulo: "¿Qué peso debo utilizar?",
+  cuerpo: [
+    "Principiante: utiliza un peso que te permita realizar todas las repeticiones con buena técnica y control. Las últimas repeticiones deben sentirse desafiantes, pero sin perder la correcta ejecución.",
+    "Intermedio: elige un peso que haga que las últimas repeticiones sean difíciles, manteniendo siempre una buena técnica.",
+    "Avanzado: trabaja con un peso que te exija al máximo según las repeticiones indicadas, sin comprometer la técnica.",
+    "Recuerda: no existe un peso exacto para cada nivel. El peso ideal depende de tu fuerza, tu experiencia y del ejercicio que estés haciendo.",
+    "Si puedes terminar todas las repeticiones fácilmente, probablemente es momento de aumentar el peso. Si no puedes completarlas con buena técnica, disminúyelo.",
+  ],
+};
+
 interface VideoSubido {
   guid: string;
   titulo: string;
@@ -111,6 +128,7 @@ async function main() {
     curso.unlockMonth = 1;
     curso.coverPhoto = curso.coverPhoto || foto;
     curso.welcomeVideo = await videoDe(subido);
+    curso.notas = [NOTA_PESOS];
     curso.status = "publicado";
     // Abierto ya: es lo que hay que comprar antes del primer día.
     curso.publicarEl = null;
@@ -162,13 +180,26 @@ async function main() {
   }
 
   /* ── El orden de la ruta: "qué necesitas" va primero ── */
-  const despues = ["entrenamiento", "movilidad", "nutricion", "masterclasses", "guia", "comunidad"];
+  const despues = ["movilidad", "entrenamiento", "nutricion", "masterclasses", "comunidad"];
   for (const [posicion, slug] of despues.entries()) {
     const curso = await Course.findOne({ slug });
     if (curso) {
       curso.order = posicion + 2;
       await curso.save();
     }
+  }
+
+  /*
+   * "La guía del Método SK" deja de ser un curso: la guía ahora es su propia
+   * sección en el menú, con el menú de la semana y las tablas. Dejarla como
+   * curso vacío prometía un material que ya está en otro lado. Se esconde, no
+   * se borra: si algún día se le sube material propio, vuelve con un cambio.
+   */
+  const guia = await Course.findOne({ slug: "guia" });
+  if (guia && guia.status !== "borrador") {
+    guia.status = "borrador";
+    await guia.save();
+    console.log("— \"La guía del Método SK\" se esconde: ya vive en su propia sección");
   }
 
   console.log("\nLa ruta quedó así:");

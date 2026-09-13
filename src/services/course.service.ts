@@ -131,6 +131,8 @@ export interface CursoParaAlumna {
    * esta noche o la semana que viene.
    */
   abreEl: string | null;
+  /** Texto del curso: se lee dentro, debajo del video. */
+  notas: Array<{ titulo: string; cuerpo: string[] }>;
   welcomeVideo: { embedUrl: string; thumbnail: string | null; completed: boolean } | null;
   lessons: Array<{
     id: string;
@@ -210,6 +212,7 @@ export async function listarParaAlumna(
       estado,
       abreEl:
         curso.publicarEl && curso.publicarEl > ahora ? curso.publicarEl.toISOString() : null,
+      notas: abierto ? (curso.notas ?? []) : [],
       welcomeVideo:
         abierto && curso.welcomeVideo?.bunnyId && hayBunny
           ? {

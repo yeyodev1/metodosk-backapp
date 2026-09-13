@@ -35,6 +35,18 @@ export interface ILesson {
   fileUrl: string | null;
 }
 
+/**
+ * Texto que acompaña al curso, además de los videos.
+ *
+ * Existe porque hay material que no es video: "qué peso debo usar" se lee, no
+ * se mira, y meterlo en otra pantalla lo alejaba justo de donde la alumna se
+ * hace la pregunta.
+ */
+export interface INota {
+  titulo: string;
+  cuerpo: string[];
+}
+
 export interface ICourse extends Document {
   title: string;
   slug: string;
@@ -56,6 +68,8 @@ export interface ICourse extends Document {
   /** El video con el que arranca el curso. */
   welcomeVideo: IVideo | null;
   lessons: ILesson[];
+  /** Texto que se lee dentro del curso, debajo del video. */
+  notas: INota[];
   status: EstadoCurso;
   /** Foto de portada (public_id de Cloudinary). */
   coverPhoto: string | null;
@@ -104,6 +118,16 @@ const courseSchema = new Schema<ICourse>(
     publicarEl: { type: Date, default: null },
     welcomeVideo: { type: videoSchema, default: null },
     lessons: { type: [lessonSchema], default: [] },
+    notas: {
+      type: [
+        {
+          _id: false,
+          titulo: { type: String, default: "" },
+          cuerpo: { type: [String], default: [] },
+        },
+      ],
+      default: [],
+    },
     status: {
       type: String,
       enum: ["borrador", "proximamente", "publicado"],
