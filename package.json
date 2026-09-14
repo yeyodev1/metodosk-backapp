@@ -19,7 +19,8 @@
     "revisar-alumna": "ts-node-dev --transpile-only src/scripts/revisarAlumna.ts",
     "programar-curso": "ts-node-dev --transpile-only src/scripts/programarCurso.ts",
     "montar-cursos": "ts-node-dev --transpile-only src/scripts/montarCursos.ts",
-    "montar-entrenamiento": "ts-node-dev --transpile-only src/scripts/montarEntrenamiento.ts"
+    "montar-entrenamiento": "ts-node-dev --transpile-only src/scripts/montarEntrenamiento.ts",
+    "ver-como-alumna": "ts-node-dev --transpile-only src/scripts/verComoAlumna.ts"
   },
   "dependencies": {
     "axios": "^1.7.9",
