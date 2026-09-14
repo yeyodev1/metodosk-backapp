@@ -37,7 +37,13 @@ const PLAN: Array<{
   challenge: "recomposicion" | "volumen";
   reto: string;
   foto: string;
-  dias: Array<{ clave: string; titulo: string; resumen: string }>;
+  /**
+   * `pendiente` es un día que existe en la semana pero todavía no tiene video:
+   * se muestra en gris, en su lugar, para que la alumna vea la semana completa
+   * y sepa que ese día viene, en vez de encontrarse un hueco entre martes y
+   * viernes.
+   */
+  dias: Array<{ clave: string; titulo: string; resumen: string; pendiente?: boolean }>;
 }> = [
   {
     slug: "entrenamiento-recomposicion",
@@ -47,6 +53,9 @@ const PLAN: Array<{
     dias: [
       { clave: "lunes-bloque-1", titulo: "Lunes · Bloque 1", resumen: "El primero de la semana. Sigue el video de principio a fin." },
       { clave: "martes-bloque-1-recomposicion", titulo: "Martes · Bloque 1", resumen: "Tu segundo día. Es el de recomposición: no es el mismo que el de volumen." },
+      { clave: "miercoles-bloque-1", titulo: "Miércoles · Bloque 1", resumen: "Tercer día de la semana." },
+      { clave: "jueves-bloque-1", titulo: "Jueves · Bloque 1", resumen: "Se publica pronto.", pendiente: true },
+      { clave: "viernes-bloque-1", titulo: "Viernes · Bloque 1", resumen: "Cierra la semana." },
     ],
   },
   {
@@ -57,6 +66,9 @@ const PLAN: Array<{
     dias: [
       { clave: "lunes-bloque-1", titulo: "Lunes · Bloque 1", resumen: "El primero de la semana. Sigue el video de principio a fin." },
       { clave: "martes-bloque-1-volumen", titulo: "Martes · Bloque 1", resumen: "Tu segundo día. Es el de volumen: no es el mismo que el de recomposición." },
+      { clave: "miercoles-bloque-1", titulo: "Miércoles · Bloque 1", resumen: "Tercer día de la semana." },
+      { clave: "jueves-bloque-1", titulo: "Jueves · Bloque 1", resumen: "Se publica pronto.", pendiente: true },
+      { clave: "viernes-bloque-1", titulo: "Viernes · Bloque 1", resumen: "Cierra la semana." },
     ],
   },
 ];
@@ -83,7 +95,8 @@ async function main() {
   const subidos = JSON.parse(readFileSync(ruta, "utf-8")) as Record<string, VideoSubido>;
 
   for (const { slug, challenge, reto, foto, dias } of PLAN) {
-    const disponibles = dias.filter((d) => subidos[d.clave]);
+    // Entra lo que ya tiene video y lo que está anunciado como pendiente.
+    const disponibles = dias.filter((d) => d.pendiente || subidos[d.clave]);
     if (!disponibles.length) {
       console.log(`— ${reto}: todavía no hay ningún día subido, se salta`);
       continue;
@@ -103,7 +116,8 @@ async function main() {
 
     let orden = 1;
     for (const dia of disponibles) {
-      const video = await videoDe(subidos[dia.clave]!);
+      // Sin video todavía: la clase queda en su lugar y en gris.
+      const video = subidos[dia.clave] ? await videoDe(subidos[dia.clave]!) : null;
       const existente = curso.lessons.find((l) => l.title === dia.titulo);
       if (existente) {
         existente.video = video;
@@ -123,7 +137,9 @@ async function main() {
 
     await curso.save();
     console.log(
-      `✓ ${curso.title} · ${disponibles.length} día(s): ${disponibles.map((d) => d.titulo).join(", ")}`,
+      `✓ ${curso.title}: ${disponibles
+        .map((d) => (subidos[d.clave] ? d.titulo : `${d.titulo} (en gris)`))
+        .join(", ")}`,
     );
   }
 
