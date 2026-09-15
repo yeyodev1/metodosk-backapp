@@ -40,9 +40,14 @@ export function currentCents(now: Date = new Date()): number {
   return isPresaleActive(now) ? presaleCents() : regularCents();
 }
 
-/** ¿El monto confirmado por PayPhone es uno de nuestros precios? */
-export function isKnownAmount(cents: number): boolean {
-  return cents === presaleCents() || cents === regularCents();
+/**
+ * ¿El monto confirmado por PayPhone es uno de nuestros precios?
+ *
+ * El de pre-venta solo vale mientras dura la pre-venta: después, un pago de
+ * $67 es un checkout viejo o un importe tocado a mano, y va a revisión.
+ */
+export function isKnownAmount(cents: number, now: Date = new Date()): boolean {
+  return cents === regularCents() || (cents === presaleCents() && isPresaleActive(now));
 }
 
 export function pricingStatus() {
