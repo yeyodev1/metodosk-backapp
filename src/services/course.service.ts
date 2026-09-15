@@ -3,7 +3,14 @@ import { User } from "../models/User";
 import { Progress } from "../models/Progress";
 import { CustomError } from "../errors/customError.error";
 import { dbConnect, isConnected } from "../config/mongo";
-import { bunnyConfig, crearSubida, estadoVideo, borrarVideo, urlEmbed } from "./bunny.service";
+import {
+  bunnyConfig,
+  crearSubida,
+  estadoVideo,
+  borrarVideo,
+  urlEmbed,
+  urlReproduccion,
+} from "./bunny.service";
 
 async function requireDb(): Promise<void> {
   if (isConnected()) return;
@@ -135,13 +142,25 @@ export interface CursoParaAlumna {
   notas: Array<{ titulo: string; cuerpo: string[] }>;
   /** A dónde lleva, si el curso es una puerta a otra pantalla. */
   enlace: string | null;
-  welcomeVideo: { embedUrl: string; thumbnail: string | null; completed: boolean } | null;
+  /**
+   * `hlsUrl` alimenta el reproductor propio de la app; `embedUrl` queda de
+   * respaldo por si ese no puede reproducir en algún navegador.
+   */
+  welcomeVideo: {
+    embedUrl: string;
+    hlsUrl: string;
+    thumbnail: string | null;
+    seconds: number;
+    completed: boolean;
+  } | null;
   lessons: Array<{
     id: string;
     title: string;
     summary: string | null;
     order: number;
     embedUrl: string | null;
+    hlsUrl: string | null;
+    thumbnail: string | null;
     fileUrl: string | null;
     durationSeconds: number | null;
     /** Dónde se quedó y si ya la terminó. */
@@ -226,7 +245,9 @@ export async function listarParaAlumna(
                 curso.welcomeVideo.bunnyId,
                 visto(String(curso._id), "welcome")?.seconds ?? 0,
               ),
+              hlsUrl: urlReproduccion(curso.welcomeVideo.bunnyId),
               thumbnail: curso.welcomeVideo.thumbnail,
+              seconds: visto(String(curso._id), "welcome")?.seconds ?? 0,
               completed: Boolean(visto(String(curso._id), "welcome")?.completed),
             }
           : null,
@@ -246,6 +267,8 @@ export async function listarParaAlumna(
               abierto && l.video?.bunnyId && hayBunny
                 ? urlEmbed(l.video.bunnyId, suyo?.seconds ?? 0)
                 : null,
+            hlsUrl: abierto && l.video?.bunnyId && hayBunny ? urlReproduccion(l.video.bunnyId) : null,
+            thumbnail: l.video?.thumbnail ?? null,
             fileUrl: abierto ? l.fileUrl : null,
             durationSeconds: l.video?.durationSeconds ?? null,
             seconds: suyo?.seconds ?? 0,
