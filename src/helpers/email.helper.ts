@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { GRUPOS_RECURSOS, GrupoRecursos, fotoUrl, recursosUrl } from "../config/recursos";
 import { BOT_USERNAME } from "../config/telegram";
+import { tiendaHtml, tiendaText } from "../config/tienda";
 
 /**
  * Correos transaccionales del reto, vía Resend.
@@ -134,6 +135,8 @@ function accessText(i: AccessEmailInput & { saludo: string; reto: string }): str
     "",
     "LO QUE VAS A NECESITAR",
     recursosText(),
+    "",
+    tiendaText(),
     "",
     i.telegramBotUrl ? "TU GRUPO DE TELEGRAM 💖" : "",
     i.telegramBotUrl ? "Ya está abierto, con Scarlett y Karen. Entra por aquí (toca Iniciar y te reconoce sola):" : "",
@@ -275,6 +278,8 @@ function accessHtml(i: AccessEmailInput & { saludo: string; reto: string }): str
 
                 ${recursosHtml()}
 
+                ${tiendaHtml()}
+
                 ${i.telegramBotUrl ? telegramBloqueHtml(i.to, i.telegramBotUrl) : ""}
 
                 <p style="margin:0 0 8px;color:#5c534c;font-size:15px;line-height:1.6;">
@@ -334,6 +339,8 @@ export async function sendResourcesEmail(input: {
         "",
         recursosText(),
         "",
+        tiendaText(),
+        "",
         `Lo tienes siempre a mano acá: ${recursosUrl()}`,
         "",
         "Scarlet Córdova y Karen López",
@@ -375,6 +382,8 @@ function resourcesHtml(saludo: string): string {
                   el reto está diseñado para que funcione con lo mínimo.
                 </p>
                 ${recursosHtml()}
+
+                ${tiendaHtml()}
               </td>
             </tr>
             <tr>
