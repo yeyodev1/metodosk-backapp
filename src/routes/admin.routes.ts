@@ -23,7 +23,7 @@ router.get("/recursos", adminController.estadoRecursos);
 router.get("/telegram", adminController.estadoTelegram);
 router.post("/telegram/avisar", adminController.avisarTelegram);
 
-// Acceso exclusivo VIP sin compra: los dos retos, el grupo VIP y el correo
+// Acceso exclusivo VIP sin compra: SK Recomposición, el grupo VIP y el correo
 // con su contraseña.
 router.post("/acceso-exclusivo", adminController.accesoExclusivo);
 

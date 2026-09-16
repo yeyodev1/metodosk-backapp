@@ -9,7 +9,7 @@ import { entradaParaCorreoDeCompra } from "./telegramAviso.service";
 
 /**
  * Acceso exclusivo: la cuenta queda como la de quien pagó en pre-venta
- * —los dos retos y el grupo VIP— y le llega el correo con su usuario y
+ * —SK Recomposición y el grupo VIP— y le llega el correo con su usuario y
  * contraseña.
  *
  * Deja una orden aprobada por $0 para que todo lo que se calcula desde la
@@ -21,7 +21,13 @@ import { entradaParaCorreoDeCompra } from "./telegramAviso.service";
  * crear. Lo único que cambia es la contraseña si todavía no la cambió ella,
  * porque es la única forma de poder mandársela otra vez.
  */
-const RETOS = ["SK Recomposición", "SK Volumen"];
+/**
+ * El acceso exclusivo da Recomposición, no los dos retos.
+ *
+ * Es el reto con el que arranca todo el mundo; Volumen es otro plan y se
+ * compra aparte. Regalar los dos de entrada vaciaba la segunda venta.
+ */
+const RETOS = ["SK Recomposición"];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export interface ResultadoAcceso {
@@ -40,12 +46,26 @@ function sumarMeses(fecha: Date, meses: number): Date {
   return d;
 }
 
-export async function darAccesoExclusivo(correo: string): Promise<ResultadoAcceso> {
+export interface OpcionesAcceso {
+  /**
+   * Desde cuándo cuentan sus meses. Por defecto, hoy.
+   *
+   * Existe para quien entra hoy pero arranca después: se le abre la cuenta ya
+   * —para que reciba su correo y se prepare— y sus tres meses empiezan el día
+   * que de verdad empieza, no el día que se le dio el acceso.
+   */
+  desde?: Date;
+}
+
+export async function darAccesoExclusivo(
+  correo: string,
+  opciones: OpcionesAcceso = {},
+): Promise<ResultadoAcceso> {
   const email = correo.toLowerCase().trim();
   if (!EMAIL.test(email)) throw new CustomError(`Revisa el correo: ${correo}`, 400);
 
   const tx = `EXCLUSIVO-${email}`;
-  const accessUntil = sumarMeses(new Date(), ACCESS_MONTHS);
+  const accessUntil = sumarMeses(opciones.desde ?? new Date(), ACCESS_MONTHS);
   const previa = await User.findOne({ email });
 
   if (!(await Order.findOne({ clientTransactionId: tx }))) {

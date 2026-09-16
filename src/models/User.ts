@@ -30,7 +30,7 @@ export interface IUser extends Document {
   /**
    * true si el acceso se lo dio la administración y no una compra.
    *
-   * Tiene todo lo de quien pagó en pre-venta —los dos retos y el grupo VIP—,
+   * Tiene todo lo de quien pagó en pre-venta —SK Recomposición y el grupo VIP—,
    * y la app se lo muestra como "acceso exclusivo" en lugar de hablarle de
    * un pago que no hizo.
    */
