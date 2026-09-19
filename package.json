@@ -13,6 +13,7 @@
     "alumna-prueba": "ts-node-dev --transpile-only src/scripts/alumnaDePrueba.ts",
     "crear-admin": "ts-node-dev --transpile-only src/scripts/crearAdmin.ts",
     "acceso-exclusivo": "ts-node-dev --transpile-only src/scripts/accesoExclusivo.ts",
+    "reenviar-acceso": "ts-node-dev --transpile-only src/scripts/reenviarAcceso.ts",
     "publicar-video": "ts-node-dev --transpile-only src/scripts/publicarVideoKaren.ts",
     "publicar-guias": "ts-node-dev --transpile-only src/scripts/publicarGuias.ts",
     "revisar-retos": "ts-node-dev --transpile-only src/scripts/revisarRetos.ts",

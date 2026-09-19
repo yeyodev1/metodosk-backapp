@@ -39,6 +39,14 @@ function formatDate(date: Date): string {
 
 export interface AccessEmailInput {
   to: string;
+  /**
+   * El correo con el que entra, cuando no es el mismo al que se le escribe.
+   *
+   * Pasa cuando el correo de la compra no le llega —spam, buzón lleno— y se
+   * le reenvía a otra dirección: el usuario sigue siendo el de la compra, y
+   * si el correo dijera el otro, no podría entrar.
+   */
+  usuario?: string | null;
   name?: string | null;
   /** Nombre del reto comprado, p. ej. "SK Recomposición". */
   challenge?: string | null;
@@ -129,7 +137,7 @@ function accessText(i: AccessEmailInput & { saludo: string; reto: string }): str
     "",
     "TUS DATOS PARA ENTRAR",
     `Entra aquí: ${loginUrl()}`,
-    `Usuario: ${i.to}`,
+    `Usuario: ${i.usuario || i.to}`,
     i.password ? `Contraseña: ${i.password}` : "Contraseña: la que ya creaste",
     i.password ? "Cámbiala cuando entres." : "",
     "",
@@ -141,7 +149,7 @@ function accessText(i: AccessEmailInput & { saludo: string; reto: string }): str
     i.telegramBotUrl ? "TU GRUPO DE TELEGRAM 💖" : "",
     i.telegramBotUrl ? "Ya está abierto, con Scarlett y Karen. Entra por aquí (toca Iniciar y te reconoce sola):" : "",
     i.telegramBotUrl ? i.telegramBotUrl : "",
-    i.telegramBotUrl ? `Si el bot te pide el correo, escríbele este: ${i.to}` : "",
+    i.telegramBotUrl ? `Si el bot te pide el correo, escríbele este: ${i.usuario || i.to}` : "",
     i.telegramBotUrl ? "" : "",
     "En las próximas horas te escribimos por WhatsApp para darte la bienvenida",
     "y entregarte el plan de entrenamiento y nutrición.",
@@ -257,7 +265,7 @@ function accessHtml(i: AccessEmailInput & { saludo: string; reto: string }): str
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                     <tr>
                       <td style="padding:4px 0;color:#8a8078;font-size:13px;">Usuario</td>
-                      <td style="padding:4px 0;color:#191413;font-size:14px;text-align:right;font-weight:600;">${i.to}</td>
+                      <td style="padding:4px 0;color:#191413;font-size:14px;text-align:right;font-weight:600;">${i.usuario || i.to}</td>
                     </tr>
                     <tr>
                       <td style="padding:4px 0;color:#8a8078;font-size:13px;">Contraseña</td>
@@ -280,7 +288,7 @@ function accessHtml(i: AccessEmailInput & { saludo: string; reto: string }): str
 
                 ${tiendaHtml()}
 
-                ${i.telegramBotUrl ? telegramBloqueHtml(i.to, i.telegramBotUrl) : ""}
+                ${i.telegramBotUrl ? telegramBloqueHtml(i.usuario || i.to, i.telegramBotUrl) : ""}
 
                 <p style="margin:0 0 8px;color:#5c534c;font-size:15px;line-height:1.6;">
                   En las próximas horas te escribimos por WhatsApp para darte la bienvenida y

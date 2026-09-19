@@ -8,9 +8,10 @@
  */
 
 /**
- * Hasta cuándo la compra da acceso a la comunidad masiva de Telegram.
+ * Hasta cuándo la compra daba acceso a la comunidad masiva de Telegram.
  *
- * Quien compra después entra igual al reto, pero el grupo se le cobra aparte.
+ * Ya no decide nada: el grupo es para todas (ver beneficiosDe). Se conserva
+ * porque el frontend todavía recibe la fecha.
  */
 const DEFAULT_TELEGRAM_DEADLINE = "2026-09-14T23:59:59-05:00";
 
@@ -34,7 +35,7 @@ export interface Beneficios {
   apertura: string;
   /** Hasta cuándo comprar incluye el grupo de Telegram. */
   telegramDeadline: string;
-  /** true si esta compradora entró a tiempo para el grupo de Telegram. */
+  /** true si tiene una compra aprobada: el grupo de Telegram es para todas. */
   telegramIncluido: boolean;
   /** true si compró dentro de la pre-venta: le toca el grupo con Scarlet y Karen. */
   grupoPremium: boolean;
@@ -60,7 +61,11 @@ export function beneficiosDe(
     enPreventa: ahora < apertura,
     apertura: apertura.toISOString(),
     telegramDeadline: telegram.toISOString(),
-    telegramIncluido: Boolean(primeraCompra && primeraCompra <= telegram),
+    // La comunidad de Telegram es para todas, compren cuando compren. El corte
+    // por fecha dejaba sin grupo —y sin enlace en su correo— a quien entraba
+    // después del 14, y eso no es lo que se quiere: alumna con acceso, alumna
+    // con grupo. La fecha se sigue devolviendo por el frontend, ya no decide.
+    telegramIncluido: Boolean(primeraCompra),
     grupoPremium: Boolean(primeraCompra && primeraCompra <= presaleDeadline),
     primeraCompra: primeraCompra ? primeraCompra.toISOString() : null,
   };
