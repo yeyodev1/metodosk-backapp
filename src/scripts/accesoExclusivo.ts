@@ -17,6 +17,9 @@ import { darAccesoExclusivo } from "../services/accesoExclusivo.service";
  * Con `--desde=2026-09-27` la cuenta se abre hoy —le llega su correo— pero
  * sus tres meses empiezan a contar ese día, para quien entra ahora y arranca
  * después.
+ *
+ * Con `--todo` lleva los dos retos, Recomposición y Volumen, en lugar de solo
+ * Recomposición. Sirve también para sumárselo a quien ya tenía el acceso.
  */
 async function main() {
   const args = process.argv.slice(2).filter(Boolean);
@@ -27,12 +30,12 @@ async function main() {
   if (desdeArg && Number.isNaN(desde!.getTime())) {
     throw new Error(`Fecha inválida: ${desdeArg}. Se escribe --desde=2026-09-27`);
   }
-  if (!correos.length) throw new Error("Uso: acceso-exclusivo [--desde=AAAA-MM-DD] correo1 ...");
+  if (!correos.length) throw new Error("Uso: acceso-exclusivo [--desde=AAAA-MM-DD] [--todo] correo1 ...");
   if (!(await dbConnect())) throw new Error("Sin base de datos");
 
   for (const correo of correos) {
     try {
-      const r = await darAccesoExclusivo(correo, { desde });
+      const r = await darAccesoExclusivo(correo, { desde, todo: args.includes("--todo") });
       console.log(
         `${r.email} · retos: ${r.retos.join(", ")} · hasta ${r.accessUntil?.slice(0, 10)}` +
           ` · contraseña: ${r.password ?? "(la que ella ya creó)"}` +

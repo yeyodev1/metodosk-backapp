@@ -28,6 +28,8 @@ import { entradaParaCorreoDeCompra } from "./telegramAviso.service";
  * compra aparte. Regalar los dos de entrada vaciaba la segunda venta.
  */
 const RETOS = ["SK Recomposición"];
+/** "Con todo": los dos retos. Solo cuando la administración lo pide así. */
+const TODOS_LOS_RETOS = ["SK Recomposición", "SK Volumen"];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export interface ResultadoAcceso {
@@ -55,6 +57,11 @@ export interface OpcionesAcceso {
    * que de verdad empieza, no el día que se le dio el acceso.
    */
   desde?: Date;
+  /**
+   * Los dos retos en lugar de solo Recomposición. Es la excepción, no la
+   * regla: se usa cuando Scarlet o Karen piden el acceso "con todo".
+   */
+  todo?: boolean;
 }
 
 export async function darAccesoExclusivo(
@@ -64,6 +71,7 @@ export async function darAccesoExclusivo(
   const email = correo.toLowerCase().trim();
   if (!EMAIL.test(email)) throw new CustomError(`Revisa el correo: ${correo}`, 400);
 
+  const retos = opciones.todo ? TODOS_LOS_RETOS : RETOS;
   const tx = `EXCLUSIVO-${email}`;
   const accessUntil = sumarMeses(opciones.desde ?? new Date(), ACCESS_MONTHS);
   const previa = await User.findOne({ email });
@@ -78,16 +86,16 @@ export async function darAccesoExclusivo(
       email,
       phoneNumber: previa?.phone ?? null,
       buyerName: previa?.name || null,
-      challenge: RETOS[0],
+      challenge: retos[0],
       accessMonths: ACCESS_MONTHS,
       accessUntil,
-      payphoneResponse: { origen: "acceso-exclusivo", retos: RETOS },
+      payphoneResponse: { origen: "acceso-exclusivo", retos },
     });
   }
 
   // Un paso por reto: ensureMember suma cada uno sin quitar el otro.
   let password: string | null = null;
-  for (const challenge of RETOS) {
+  for (const challenge of retos) {
     const r = await ensureMember({ email, challenge, accessUntil, clientTransactionId: tx });
     password = password ?? r.password;
   }
@@ -108,7 +116,7 @@ export async function darAccesoExclusivo(
   const correoEnviado = await sendAccessEmail({
     to: email,
     name: user.name || null,
-    challenge: RETOS.join(" y "),
+    challenge: user.challenges.join(" y ") || retos.join(" y "),
     amountCents: 0,
     accessMonths: ACCESS_MONTHS,
     accessUntil: user.accessUntil ?? accessUntil,
