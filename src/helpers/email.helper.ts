@@ -151,8 +151,8 @@ function accessText(i: AccessEmailInput & { saludo: string; reto: string }): str
     i.telegramBotUrl ? i.telegramBotUrl : "",
     i.telegramBotUrl ? `Si el bot te pide el correo, escríbele este: ${i.usuario || i.to}` : "",
     i.telegramBotUrl ? "" : "",
-    "En las próximas horas te escribimos por WhatsApp para darte la bienvenida",
-    "y entregarte el plan de entrenamiento y nutrición.",
+    "Tu plan de entrenamiento y nutrición ya está dentro de la plataforma:",
+    "entra con tus datos y ahí lo encuentras todo.",
     "",
     "Scarlet Córdova y Karen López",
     "Método SK",
@@ -291,8 +291,8 @@ function accessHtml(i: AccessEmailInput & { saludo: string; reto: string }): str
                 ${i.telegramBotUrl ? telegramBloqueHtml(i.usuario || i.to, i.telegramBotUrl) : ""}
 
                 <p style="margin:0 0 8px;color:#5c534c;font-size:15px;line-height:1.6;">
-                  En las próximas horas te escribimos por WhatsApp para darte la bienvenida y
-                  entregarte tu plan de entrenamiento y nutrición.
+                  Tu plan de entrenamiento y nutrición ya está dentro de la plataforma: entra con
+                  tus datos y ahí lo encuentras todo.
                 </p>
               </td>
             </tr>
