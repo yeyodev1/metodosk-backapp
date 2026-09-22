@@ -5,6 +5,7 @@ import * as adminController from "../controllers/admin.controller";
 import * as courseController from "../controllers/course.controller";
 import * as settingsController from "../controllers/settings.controller";
 import * as commentController from "../controllers/comment.controller";
+import * as avancesController from "../controllers/avances.controller";
 
 const router = Router();
 
@@ -48,6 +49,12 @@ router.get("/vsl", settingsController.vslAdmin);
 router.post("/vsl/video", settingsController.prepararVsl);
 router.get("/vsl/estado", settingsController.refrescarVsl);
 router.delete("/vsl", settingsController.borrarVsl);
+
+// Las fotos de avance de cada alumna y los comentarios del equipo sobre ellas.
+router.get("/avances", avancesController.listar);
+router.get("/avances/:id", avancesController.ficha);
+router.post("/avances/:id/notas", avancesController.comentar);
+router.delete("/avances/notas/:notaId", avancesController.borrarNota);
 
 // Moderación de comentarios.
 router.get("/comments", commentController.listarAdmin);
