@@ -766,3 +766,236 @@ function novedadHtml(i: {
   </body>
 </html>`;
 }
+
+/* ─────────────── Comentario sobre su avance ─────────────── */
+
+export interface NotaAvanceEmailInput {
+  to: string;
+  name?: string | null;
+  /** Quien firma, ya resuelto: "Karen López", "Karen", "Nutrición", "K". */
+  firma: { nombre: string; corto: string; rol: string; inicial: string; esEquipo: boolean };
+  /** El día de las fotos que se comentaron, si se estaba mirando una toma. */
+  tomaDel?: Date | null;
+  /** A dónde lleva el botón: su progreso, con el comentario marcado. */
+  url: string;
+}
+
+/**
+ * "Karen miró tus fotos y te dejó un comentario".
+ *
+ * El correo **no lleva el comentario ni las fotos**, a propósito: habla de su
+ * cuerpo, y un correo se reenvía, se previsualiza en la pantalla bloqueada y
+ * queda en buzones que no controlamos. Lo que viaja es el aviso; lo privado se
+ * lee entrando a su cuenta. En lugar del texto va una carta sellada, que dice
+ * justo eso sin tener que explicarlo.
+ *
+ * Nunca lanza: si falla, la nota queda pendiente y el cron la reintenta.
+ */
+export async function sendNotaAvanceEmail(input: NotaAvanceEmailInput): Promise<boolean> {
+  const resend = getResend();
+  if (!resend || !input.to) return false;
+
+  const firstName = (input.name || "").trim().split(/\s+/)[0] || "";
+  const saludo = firstName ? `¡Hola ${firstName}!` : "¡Hola!";
+  const quien = input.firma.corto;
+  const asunto = input.firma.esEquipo
+    ? "El equipo de Método SK comentó tu avance 💬"
+    : `${quien} comentó tu avance 💬`;
+  const toma = input.tomaDel ? formatDate(input.tomaDel) : null;
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: sender(),
+      to: input.to,
+      subject: asunto,
+      html: notaAvanceHtml({ ...input, saludo, toma }),
+      text: [
+        saludo,
+        "",
+        `${quien} revisó tu avance${toma ? ` del ${toma}` : ""} y te dejó un comentario.`,
+        "Por tu privacidad no lo enviamos por correo: lo lees entrando a tu cuenta, en Mi progreso.",
+        "",
+        `Leer el comentario: ${input.url}`,
+        "",
+        "Scarlett Córdova y Karen López",
+        "Método SK",
+      ].join("\n"),
+    });
+
+    if (error) {
+      console.error(`[email] Resend rechazó el aviso de nota a ${input.to}:`, error);
+      return false;
+    }
+    console.log(`[email] aviso de nota enviado a ${input.to} · resend_id=${data?.id ?? "?"}`);
+    return true;
+  } catch (error) {
+    console.error("[email] no se pudo enviar el aviso de nota:", error);
+    return false;
+  }
+}
+
+function notaAvanceHtml(
+  i: NotaAvanceEmailInput & { saludo: string; toma: string | null },
+): string {
+  const escapar = (t: string) =>
+    t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  const quien = escapar(i.firma.corto);
+  const titulo = i.firma.esEquipo ? "Miramos tus fotos" : `${quien} miró tus fotos`;
+  const cta = i.firma.esEquipo ? "Leer el comentario" : `Leer el comentario de ${quien}`;
+  const sobre = i.toma ? `tu avance del <strong style="color:#191413;">${i.toma}</strong>` : "tu avance";
+  const hoy = formatDate(new Date());
+
+  // Las líneas "tachadas" de la carta: anchos distintos para que se lea como
+  // un párrafo y no como una barra de carga.
+  const renglones = ["94%", "86%", "91%", "58%"]
+    .map(
+      (ancho) => `
+                      <tr>
+                        <td style="padding:0 0 9px;">
+                          <div style="width:${ancho};height:8px;border-radius:8px;background:#ead9d1;line-height:8px;font-size:0;">&nbsp;</div>
+                        </td>
+                      </tr>`,
+    )
+    .join("");
+
+  return `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
+    <title>${titulo}</title>
+    <style>
+      @media (max-width: 480px) {
+        .pad { padding-left: 22px !important; padding-right: 22px !important; }
+      }
+    </style>
+  </head>
+  <body style="margin:0;padding:0;background:#f6f1ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+    <!-- Lo que se lee en la bandeja antes de abrirlo -->
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f6f1ec;">
+      ${titulo} y ${i.firma.esEquipo ? "te dejamos" : "te dejó"} una recomendación personal. Entra a leerla.
+      &#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f1ec;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px;background:#fffdfb;border-radius:20px;overflow:hidden;box-shadow:0 18px 40px rgba(25,20,19,.08);">
+
+            <!-- Cabecera -->
+            <tr>
+              <td class="pad" style="background:#191413;padding:34px 36px 30px;">
+                <div style="color:#c4877f;font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;">Método SK · Tu avance</div>
+                <div style="margin-top:14px;color:#fffdfb;font-family:Georgia,'Times New Roman',serif;font-size:32px;line-height:1.12;">
+                  ${titulo}
+                </div>
+                <div style="margin-top:6px;color:#f3d9cf;font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:20px;line-height:1.3;">
+                  ${i.firma.esEquipo ? "y te dejamos un comentario" : "y te dejó un comentario"}
+                </div>
+              </td>
+            </tr>
+
+            <!-- Quién firma -->
+            <tr>
+              <td class="pad" style="background:#f2ddd8;padding:18px 36px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td width="52" valign="middle">
+                      <div style="width:44px;height:44px;border-radius:50%;background:#191413;color:#f2ddd8;font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:${i.firma.inicial.length > 1 ? 15 : 20}px;line-height:44px;text-align:center;">${escapar(i.firma.inicial)}</div>
+                    </td>
+                    <td valign="middle" style="padding-left:12px;">
+                      <div style="color:#191413;font-size:15px;font-weight:600;">${escapar(i.firma.nombre)}</div>
+                      <div style="color:#6d3b46;font-size:12px;margin-top:3px;"><span style="letter-spacing:.06em;text-transform:uppercase;">${escapar(i.firma.rol)}</span> <span style="color:#8c7f78;">· ${hoy}</span></div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Cuerpo -->
+            <tr>
+              <td class="pad" style="padding:30px 36px 8px;">
+                <p style="margin:0 0 12px;color:#191413;font-size:17px;">${i.saludo}</p>
+                <p style="margin:0 0 24px;color:#4a403c;font-size:15px;line-height:1.65;">
+                  Revisamos ${sobre} y ${i.firma.esEquipo ? "te dejamos" : `${quien} te dejó`} una
+                  recomendación pensada solo para ti. Está esperándote en tu cuenta, en
+                  <strong style="color:#191413;">Mi progreso</strong>.
+                </p>
+
+                <!-- La carta sellada: dice "es privado" sin tener que explicarlo -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fbf5f2;border:1px solid #ecdcd4;border-radius:16px;">
+                  <tr>
+                    <td style="padding:20px 22px 12px;">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="padding:0 0 14px;color:#a5655d;font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;">
+                            &#128274;&nbsp; Mensaje privado para ti
+                          </td>
+                        </tr>
+                        ${renglones}
+                        <tr>
+                          <td style="padding:6px 0 4px;color:#8c7f78;font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:14px;">
+                            — ${escapar(i.firma.nombre)}
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- El botón -->
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px auto 8px;">
+                  <tr>
+                    <td align="center" style="background:#191413;border-radius:999px;">
+                      <a href="${i.url}" style="display:inline-block;padding:16px 34px;color:#fffdfb;font-size:14px;font-weight:600;letter-spacing:.06em;text-decoration:none;">
+                        ${cta} &rarr;
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td class="pad" style="padding:14px 36px 26px;">
+                <p style="margin:0;color:#8c7f78;font-size:12.5px;line-height:1.6;text-align:center;">
+                  Tus fotos y lo que te escribimos nunca viajan por correo: solo se ven entrando a tu cuenta.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Firma -->
+            <tr>
+              <td class="pad" style="padding:20px 36px 28px;border-top:1px solid #f0e6df;color:#8c7f78;font-size:13px;line-height:1.6;">
+                Scarlett Córdova · entrenamiento<br />
+                Karen López · nutrición
+              </td>
+            </tr>
+          </table>
+
+          <div style="max-width:540px;margin-top:16px;color:#a39a92;font-size:12px;line-height:1.6;">
+            Si el botón no abre, copia este enlace:<br />
+            <a href="${i.url}" style="color:#a5655d;word-break:break-all;">${i.url}</a><br /><br />
+            Recibes este correo porque estás dentro del reto en metodosk.ec
+          </div>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+/** Solo para mirar el diseño en local. */
+export function __previewNotaAvance(): string {
+  return notaAvanceHtml({
+    to: "alumna@ejemplo.com",
+    name: "María José",
+    firma: { nombre: "Karen López", corto: "Karen", rol: "Nutrición", inicial: "K", esEquipo: false },
+    tomaDel: new Date(),
+    url: "https://metodosk.ec/mi-progreso?nota=abc123#notas",
+    saludo: "¡Hola María!",
+    toma: formatDate(new Date()),
+  });
+}
