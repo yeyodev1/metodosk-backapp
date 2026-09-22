@@ -4,6 +4,7 @@ import { CustomError } from "../errors/customError.error";
 import { enviarTandaDeRecursos } from "../services/recursos.service";
 import { enviarTandaDeAviso } from "../services/telegramAviso.service";
 import { enviarTandaDeNovedad } from "../services/novedades.service";
+import { reintentarAvisos } from "../services/avances.service";
 
 const router = Router();
 
@@ -88,6 +89,26 @@ router.get("/novedad", soloCron, async (_req, res, next) => {
     console.log(
       `[cron] novedad: ${resultado.enviados} enviados, ${resultado.fallidos} fallidos, ${resultado.pendientes} pendientes`,
     );
+    res.status(200).json(resultado);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/cron/notas — los avisos de "Karen comentó tu avance" que no
+ * salieron al momento (Resend caído o sin cupo). El envío normal es inmediato;
+ * esto solo recoge lo que quedó colgado.
+ */
+router.get("/notas", soloCron, async (_req, res, next) => {
+  try {
+    if (!isConnected() && !(await dbConnect())) {
+      throw new CustomError("Sin base de datos", 503);
+    }
+    const resultado = await reintentarAvisos();
+    if (resultado.enviados || resultado.fallidos) {
+      console.log(`[cron] notas: ${resultado.enviados} enviados, ${resultado.fallidos} fallidos`);
+    }
     res.status(200).json(resultado);
   } catch (error) {
     next(error);
