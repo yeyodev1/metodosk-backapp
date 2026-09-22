@@ -149,7 +149,7 @@ function armarEstado(user: InstanceType<typeof User>): EstadoOnboarding {
   };
 }
 
-function mapaMedida(m: InstanceType<typeof User>["measurements"][number]): Medida {
+export function mapaMedida(m: InstanceType<typeof User>["measurements"][number]): Medida {
   return {
     pesoKg: m.pesoKg ?? null,
     cinturaCm: m.cinturaCm ?? null,
@@ -170,7 +170,7 @@ function mapaMedida(m: InstanceType<typeof User>["measurements"][number]): Medid
  * cuando hay dos tomas distintas del mismo ángulo — una foto contra sí misma
  * no es una comparación, es un error de la pantalla.
  */
-function armarComparativa(
+export function armarComparativa(
   fotos: InstanceType<typeof User>["progressPhotos"],
   hayCloudinary: boolean,
 ): Comparativa[] {
