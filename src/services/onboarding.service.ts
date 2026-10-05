@@ -156,7 +156,10 @@ function armarEstado(user: InstanceType<typeof User>): EstadoOnboarding {
     photosUploaded: onboarding.photosUploaded,
     skipped: onboarding.skipped,
     completedAt: onboarding.completedAt ? onboarding.completedAt.toISOString() : null,
-    done: Boolean(onboarding.completedAt) || onboarding.skipped,
+    // Las fotos de partida ya no se pueden saltar: sin frente y espalda no hay
+    // seguimiento posible, y "Completar luego" terminaba siendo nunca. Si
+    // Cloudinary falla no se bloquea a nadie: no es culpa de ella.
+    done: !hayCloudinary || ANGULOS_PEDIDOS.every((a) => fotos.some((f) => f.angulo === a)),
     fotos: fotos.map((f) => ({
       angulo: f.angulo,
       // Firmada al vuelo: la URL no se guarda, se construye cuando se pide.
@@ -294,10 +297,11 @@ export async function guardarFoto(
     createdAt: new Date(),
   });
 
-  // Con una foto ya cuenta: pedirle las tres para dejarla entrar sería
-  // convertir un recordatorio útil en un peaje.
   user.onboarding.photosUploaded = true;
-  if (user.onboarding.videoSeen && !user.onboarding.completedAt) {
+  const tieneTodas = ANGULOS_PEDIDOS.every((a) =>
+    user.progressPhotos.some((f) => f.angulo === a),
+  );
+  if (tieneTodas && !user.onboarding.completedAt) {
     user.onboarding.completedAt = new Date();
   }
 
