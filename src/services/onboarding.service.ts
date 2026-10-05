@@ -31,11 +31,11 @@ export const ANGULOS_PEDIDOS: Angulo[] = ["frente", "espalda"];
 /**
  * Cada cuánto toca repetir las fotos.
  *
- * Una vez al mes. Quincenal daba un cambio tan chico entre toma y toma que la
- * comparación desanimaba en vez de motivar: a los catorce días el espejo no se
- * mueve, y lo que se ve es "no pasó nada". Al mes sí hay diferencia que mirar.
+ * Cada quince días: es el seguimiento que hace el equipo. La comparación
+ * igual es contra la primera foto, no contra la anterior, así que el cambio
+ * se ve aunque entre una toma y otra se mueva poco.
  */
-export const DIAS_ENTRE_TOMAS = 30;
+export const DIAS_ENTRE_TOMAS = 15;
 
 /** Los campos de una toma de medidas. Todos opcionales: se apunta lo que se midió. */
 export interface Medida {
@@ -91,10 +91,10 @@ export interface EstadoOnboarding {
 const DIA_MS = 86_400_000;
 
 /**
- * Una foto subida hasta estos días antes de la fecha cuenta como la de ese mes.
+ * Una foto subida hasta estos días antes de la fecha cuenta como la de esa toma.
  * Así quien se adelanta un poco no recibe un "hoy te toca" a la semana.
  */
-export const DIAS_ADELANTO = 10;
+export const DIAS_ADELANTO = 5;
 
 /**
  * Cuándo toca la siguiente toma.
