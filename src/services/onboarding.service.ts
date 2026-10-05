@@ -88,6 +88,37 @@ export interface EstadoOnboarding {
   fotosDisponibles: boolean;
 }
 
+const DIA_MS = 86_400_000;
+
+/**
+ * Una foto subida hasta estos días antes de la fecha cuenta como la de ese mes.
+ * Así quien se adelanta un poco no recibe un "hoy te toca" a la semana.
+ */
+export const DIAS_ADELANTO = 10;
+
+/**
+ * Cuándo toca la siguiente toma.
+ *
+ * El calendario sale de la primera foto y no se mueve: primera + 30, + 60,
+ * + 90. Antes se contaba desde la más reciente, y subir una foto antes de
+ * tiempo corría todo el calendario (subió el 1 en vez del 10 y la siguiente
+ * pasaba al 31).
+ */
+export function calcularProximaToma(
+  fotos: Array<{ createdAt: Date }>,
+): Date | null {
+  if (!fotos.length) return null;
+
+  const tiempos = fotos.map((f) => f.createdAt.getTime());
+  const primera = Math.min(...tiempos);
+  const ultima = Math.max(...tiempos);
+  const periodo = DIAS_ENTRE_TOMAS * DIA_MS;
+
+  // El mes que cubre la última foto, contando el adelanto permitido.
+  const cubierto = Math.floor((ultima - primera + DIAS_ADELANTO * DIA_MS) / periodo);
+  return new Date(primera + (cubierto + 1) * periodo);
+}
+
 function armarEstado(user: InstanceType<typeof User>): EstadoOnboarding {
   const onboarding = user.onboarding || {
     videoSeen: false,
@@ -113,12 +144,8 @@ function armarEstado(user: InstanceType<typeof User>): EstadoOnboarding {
     }
   }
 
-  const masReciente = fotos[0]?.createdAt ?? null;
-  const proximaToma = masReciente
-    ? new Date(masReciente.getTime() + DIAS_ENTRE_TOMAS * 86_400_000)
-    : null;
-
   const ahora = new Date();
+  const proximaToma = calcularProximaToma(fotos);
   // Días enteros hacia arriba: faltando 20 horas se dice "1 día", no "0".
   const diasParaProxima = proximaToma
     ? Math.max(0, Math.ceil((proximaToma.getTime() - ahora.getTime()) / 86_400_000))
@@ -341,21 +368,50 @@ const LIMITES: Record<string, [number, number]> = {
   piernaCm: [20, 150],
 };
 
+/** Cómo se nombra cada campo en los errores: "pesoKg" no le dice nada a ella. */
+const NOMBRES: Record<string, string> = {
+  pesoKg: "peso",
+  cinturaCm: "cintura",
+  caderaCm: "cadera",
+  pechoCm: "pecho",
+  brazoCm: "brazo",
+  piernaCm: "pierna",
+};
+
+const KG_POR_LIBRA = 0.45359237;
+
 /**
  * Un campo que ella dejó en blanco vale null, no cero.
  *
  * La diferencia importa: cero kilos en la gráfica dibuja un desplome que nunca
  * pasó. Si no lo midió, no hay dato — y el histórico lo dibuja como hueco.
+ *
+ * Se acepta lo que se escribe de verdad: "62,5 kg", "62.5kg", "130 lb". Acá
+ * casi todas se pesan en libras, y antes "130 lb" se rechazaba entero y la
+ * toma se guardaba sin peso.
  */
 function numeroOpcional(valor: unknown, campo: string): number | null {
   if (valor === null || valor === undefined || valor === "") return null;
 
-  const n = Number(valor);
-  if (!Number.isFinite(n)) throw new CustomError(`Revisa el valor de ${campo}`, 400);
+  const nombre = NOMBRES[campo] ?? campo;
+  const texto = String(valor).trim().toLowerCase().replace(",", ".");
+  if (!texto) return null;
+
+  const coincide = texto.match(/^(\d+(?:\.\d+)?)\s*([a-z.]*)$/);
+  if (!coincide) throw new CustomError(`Revisa el valor de ${nombre}: escribe solo el número`, 400);
+
+  let n = Number(coincide[1]);
+  const unidad = coincide[2]!.replace(/\./g, "");
+  if (campo === "pesoKg" && ["lb", "lbs", "libra", "libras"].includes(unidad)) {
+    n = n * KG_POR_LIBRA;
+  } else if (unidad && !["kg", "kgs", "kilo", "kilos", "cm", "cms"].includes(unidad)) {
+    throw new CustomError(`Revisa el valor de ${nombre}: escribe solo el número`, 400);
+  }
+  if (!Number.isFinite(n)) throw new CustomError(`Revisa el valor de ${nombre}`, 400);
 
   const [min, max] = LIMITES[campo]!;
   if (n < min || n > max) {
-    throw new CustomError(`Ese valor de ${campo} no parece correcto`, 400);
+    throw new CustomError(`Ese valor de ${nombre} no parece correcto`, 400);
   }
   // Un decimal: la cinta métrica no da para más y evita "72.4000000001".
   return Math.round(n * 10) / 10;
