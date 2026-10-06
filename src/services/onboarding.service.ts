@@ -86,9 +86,23 @@ export interface EstadoOnboarding {
   medidas: Medida[];
   /** false si falta configurar Cloudinary: la vista lo dice en vez de fallar. */
   fotosDisponibles: boolean;
+  /** Días que tiene para cambiar una foto ya subida. */
+  diasParaCambiar: number;
 }
 
 const DIA_MS = 86_400_000;
+
+/**
+ * Cuántos días hay para cambiar una foto después de subirla.
+ *
+ * Hay quien sube cualquier foto para poder entrar a entrenar ese día, y la
+ * buena la toma después. Pasado este plazo la foto queda fija: es su histórico.
+ */
+export const DIAS_PARA_CAMBIAR = 3;
+
+function sePuedeCambiar(createdAt: Date, ahora = new Date()): boolean {
+  return ahora.getTime() - createdAt.getTime() < DIAS_PARA_CAMBIAR * DIA_MS;
+}
 
 /**
  * Una foto subida hasta estos días antes de la fecha cuenta como la de esa toma.
@@ -176,6 +190,7 @@ function armarEstado(user: InstanceType<typeof User>): EstadoOnboarding {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .map(mapaMedida),
     fotosDisponibles: hayCloudinary,
+    diasParaCambiar: DIAS_PARA_CAMBIAR,
   };
 }
 
@@ -265,8 +280,8 @@ export function firmarFoto(userId: string, angulo: string) {
  * la misma ropa es poder comparar la semana 1 con la semana 12. Borrar la
  * anterior tiraría justo lo que hace que valga la pena tomarlas.
  *
- * Lo único que se reemplaza es una foto del mismo ángulo tomada hoy: eso no es
- * una toma nueva, es que la primera le salió mal.
+ * Lo único que se reemplaza es una foto del mismo ángulo subida hace menos de
+ * `DIAS_PARA_CAMBIAR` días: eso no es una toma nueva, es la misma corregida.
  */
 export async function guardarFoto(
   userId: string,
@@ -282,19 +297,21 @@ export async function guardarFoto(
   const user = await User.findById(userId);
   if (!user) throw new CustomError("Cuenta no encontrada", 404);
 
-  const hoy = new Date().toDateString();
-  const deHoy = user.progressPhotos.find(
-    (f) => f.angulo === angulo && f.createdAt.toDateString() === hoy,
-  );
-  if (deHoy) {
-    await borrarFoto(deHoy.publicId).catch(() => undefined);
-    user.progressPhotos = user.progressPhotos.filter((f) => f.publicId !== deHoy.publicId);
+  // Si la última de ese ángulo todavía se puede cambiar, esta la reemplaza y
+  // conserva su fecha: es la misma toma, y así el calendario no se corre.
+  const ultima = user.progressPhotos
+    .filter((f) => f.angulo === angulo)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+  const reemplaza = ultima && sePuedeCambiar(ultima.createdAt) ? ultima : null;
+  if (reemplaza) {
+    await borrarFoto(reemplaza.publicId).catch(() => undefined);
+    user.progressPhotos = user.progressPhotos.filter((f) => f.publicId !== reemplaza.publicId);
   }
 
   user.progressPhotos.push({
     angulo: angulo as Angulo,
     publicId: publicId.trim(),
-    createdAt: new Date(),
+    createdAt: reemplaza?.createdAt ?? new Date(),
   });
 
   user.onboarding.photosUploaded = true;
@@ -309,7 +326,7 @@ export async function guardarFoto(
   return armarEstado(user);
 }
 
-/** Quita la foto más reciente de un ángulo — la que acaba de subir. */
+/** Quita la foto más reciente de un ángulo, si todavía está en plazo de cambio. */
 export async function quitarFoto(userId: string, angulo: string): Promise<EstadoOnboarding> {
   await requireDb();
   const user = await User.findById(userId);
@@ -319,6 +336,13 @@ export async function quitarFoto(userId: string, angulo: string): Promise<Estado
     .filter((f) => f.angulo === angulo)
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   const foto = delAngulo[0];
+
+  if (foto && !sePuedeCambiar(foto.createdAt)) {
+    throw new CustomError(
+      `Esa foto ya no se puede quitar: se cambian hasta ${DIAS_PARA_CAMBIAR} días después de subirlas`,
+      400,
+    );
+  }
 
   if (foto) {
     await borrarFoto(foto.publicId).catch(() => undefined);
