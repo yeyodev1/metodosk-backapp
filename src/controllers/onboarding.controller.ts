@@ -80,6 +80,18 @@ export async function guardarMedidas(req: AuthRequest, res: Response, next: Next
   }
 }
 
+export async function completarMedidas(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const fecha = String(req.params.fecha || "");
+    if (!fecha) throw new CustomError("Falta la fecha", 400);
+    res
+      .status(200)
+      .json(await onboardingService.completarMedidas(req.user!.userId, fecha, req.body ?? {}));
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function quitarMedidas(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const fecha = String(req.params.fecha || "");

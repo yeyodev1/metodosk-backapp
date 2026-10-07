@@ -70,6 +70,18 @@ async function main() {
       else if (!vigente) console.log("   falta: acceso vigente");
       else console.log(`   falta: la guía de ${audiencias.join(", ")} no está cargada`);
     }
+
+    // "Puse mi peso y no aparece": lo que de verdad quedó guardado.
+    const fotos = u.progressPhotos || [];
+    console.log(`\nfotos    ${fotos.length ? fotos.map((f) => `${f.angulo} ${fecha(f.createdAt)}`).join(" · ") : "ninguna"}`);
+    const medidas = [...(u.measurements || [])].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    console.log(`medidas  ${medidas.length ? "" : "ninguna"}`);
+    for (const m of medidas) {
+      const campos = (["pesoKg", "cinturaCm", "caderaCm", "pechoCm", "brazoCm", "piernaCm"] as const)
+        .map((k) => `${k}=${m[k] ?? "—"}`)
+        .join(" ");
+      console.log(`  ${fecha(m.createdAt)} · ${campos}${m.nota ? ` · "${m.nota}"` : ""}`);
+    }
   }
 
   if (ordenes.length) {

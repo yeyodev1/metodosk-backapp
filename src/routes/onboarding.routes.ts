@@ -13,6 +13,7 @@ router.post("/foto/firma", onboardingController.firmarFoto);
 router.post("/foto", onboardingController.guardarFoto);
 router.delete("/foto/:angulo", onboardingController.quitarFoto);
 router.post("/medidas", onboardingController.guardarMedidas);
+router.patch("/medidas/:fecha", onboardingController.completarMedidas);
 router.delete("/medidas/:fecha", onboardingController.quitarMedidas);
 // Lo que el equipo le comentó sobre su avance, y sus respuestas.
 router.get("/notas", avancesController.misNotas);

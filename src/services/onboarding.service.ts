@@ -514,3 +514,46 @@ export async function quitarMedidas(userId: string, fechaIso: string): Promise<E
   await user.save();
   return armarEstado(user);
 }
+
+/**
+ * Apunta lo que le faltó a una toma anterior.
+ *
+ * Hasta el 5/10 el campo de peso era numérico y "130 lb" o "62,5" llegaban
+ * vacíos: la toma se guardaba sin peso y sin avisarle. Volver a guardar hoy no
+ * lo arregla —queda como toma de hoy, y su punto cero sigue sin peso—, así que
+ * se completa la toma de ese día.
+ *
+ * Solo se llenan los huecos: lo que ya estaba apuntado es su histórico y no se
+ * reescribe desde acá.
+ */
+export async function completarMedidas(
+  userId: string,
+  fechaIso: string,
+  entrada: EntradaMedidas,
+): Promise<EstadoOnboarding> {
+  await requireDb();
+
+  const objetivo = new Date(fechaIso);
+  if (Number.isNaN(objetivo.getTime())) throw new CustomError("Fecha no válida", 400);
+
+  const user = await User.findById(userId);
+  if (!user) throw new CustomError("Cuenta no encontrada", 404);
+
+  const dia = objetivo.toDateString();
+  const toma = user.measurements.find((m) => m.createdAt.toDateString() === dia);
+  if (!toma) throw new CustomError("No encontramos esa toma", 404);
+
+  let cambio = false;
+  for (const campo of Object.keys(LIMITES) as Array<keyof typeof LIMITES & keyof EntradaMedidas>) {
+    const valor = numeroOpcional(entrada[campo], campo);
+    const actual = toma[campo as "pesoKg"];
+    if (valor !== null && (actual === null || actual === undefined)) {
+      toma[campo as "pesoKg"] = valor;
+      cambio = true;
+    }
+  }
+  if (!cambio) throw new CustomError("Escribe al menos una medida que le falte a esa toma", 400);
+
+  await user.save();
+  return armarEstado(user);
+}
