@@ -1,4 +1,5 @@
 import { Progress, UMBRAL_COMPLETADO } from "../models/Progress";
+import { invalidarPuntos } from "./puntos.service";
 import { Course } from "../models/Course";
 import { CustomError } from "../errors/customError.error";
 import { dbConnect, isConnected } from "../config/mongo";
@@ -118,6 +119,9 @@ export async function guardar(
     },
     { upsert: true, new: true },
   );
+
+  // Una clase recién terminada suma puntos: que los vea subir al volver.
+  if (completado && !actual?.completed) invalidarPuntos();
 
   return {
     courseId: fila.courseId,

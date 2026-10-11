@@ -194,3 +194,42 @@ export function urlAvatar(publicId: string | null, lado = 96): string | null {
   if (!config) return null;
   return `https://res.cloudinary.com/${config.cloudName}/image/upload/c_fill,g_face,w_${lado},h_${lado},q_auto,f_auto/${publicId}`;
 }
+
+/* ─────────────── Foto de un logro en la comunidad ─────────────── */
+
+/**
+ * Prepara la subida de la foto de una publicación.
+ *
+ * Pública, como el avatar: la ve toda la comunidad, y es ella la que elige
+ * compartirla. Se achica al subir —nadie necesita la foto de 12 MP del
+ * teléfono para verla en el muro— y no se recorta: un plato o una toma de
+ * espejo pierden sentido cortados al cuadrado.
+ */
+export function firmarSubidaPost(userId: string): SubidaAvatarFirmada {
+  const config = requireCloudinary();
+
+  const folder = "metodosk/comunidad";
+  const publicId = `${userId}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+  const timestamp = Math.floor(Date.now() / 1000);
+  const transformation = "c_limit,w_1600,h_1600,q_auto";
+
+  const params = { folder, public_id: publicId, timestamp, transformation };
+
+  return {
+    uploadUrl: `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`,
+    apiKey: config.apiKey,
+    timestamp,
+    signature: firmar(params, config.apiSecret),
+    publicId,
+    folder,
+    transformation,
+  };
+}
+
+/** URL de la foto de una publicación, al ancho en que se pinta. */
+export function urlFotoPost(publicId: string | null, ancho = 1000): string | null {
+  if (!publicId) return null;
+  const config = cloudinaryConfig();
+  if (!config) return null;
+  return `https://res.cloudinary.com/${config.cloudName}/image/upload/c_limit,w_${ancho},q_auto,f_auto/${publicId}`;
+}

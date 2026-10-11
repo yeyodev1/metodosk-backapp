@@ -1,8 +1,23 @@
-import { CommunityPost, MAX_LARGO_POST } from "../models/CommunityPost";
+import { Types } from "mongoose";
+import {
+  CommunityPost,
+  MAX_LARGO_POST,
+  TIPOS_POST,
+  TIPOS_REACCION,
+  type TipoPost,
+  type TipoReaccion,
+} from "../models/CommunityPost";
 import { User } from "../models/User";
 import { CustomError } from "../errors/customError.error";
 import { dbConnect, isConnected } from "../config/mongo";
-import { firmarSubidaAvatar, urlAvatar, borrarImagen } from "./cloudinary.service";
+import {
+  firmarSubidaAvatar,
+  firmarSubidaPost,
+  urlAvatar,
+  urlFotoPost,
+  borrarImagen,
+} from "./cloudinary.service";
+import { invalidarPuntos, nivelesDeAutoras } from "./puntos.service";
 
 async function requireDb(): Promise<void> {
   if (isConnected()) return;
@@ -32,10 +47,27 @@ export interface MensajePublico {
   fromStaff: boolean;
   createdAt: string;
   mine: boolean;
+  tipo: TipoPost;
+  /** La foto del logro, lista para pintar. */
+  imagenUrl: string | null;
+  /** Cuántas de cada una. */
+  reacciones: Record<TipoReaccion, number>;
+  /** Las que puso ella, para pintarlas activas. */
+  misReacciones: TipoReaccion[];
+  /** Su nivel en el reto, junto a su nombre. null para el equipo. */
+  nivel: { nivel: number; nombre: string } | null;
 }
 
-function mapa(fila: any, userId: string): MensajePublico {
+type Niveles = Map<string, { nivel: number; nombre: string }>;
+
+function mapa(fila: any, userId: string, niveles: Niveles): MensajePublico {
   const authorName = fila.authorName || "Alumna";
+  const reacciones = { fuerza: 0, fuego: 0, aplauso: 0 } as Record<TipoReaccion, number>;
+  const misReacciones: TipoReaccion[] = [];
+  for (const r of fila.reacciones ?? []) {
+    reacciones[r.tipo as TipoReaccion]++;
+    if (String(r.user) === userId) misReacciones.push(r.tipo);
+  }
   return {
     id: String(fila._id),
     authorName,
@@ -45,7 +77,17 @@ function mapa(fila: any, userId: string): MensajePublico {
     fromStaff: Boolean(fila.fromStaff),
     createdAt: fila.createdAt.toISOString(),
     mine: String(fila.user) === userId,
+    tipo: fila.tipo ?? "general",
+    imagenUrl: urlFotoPost(fila.imagen ?? null),
+    reacciones,
+    misReacciones,
+    nivel: fila.fromStaff ? null : (niveles.get(String(fila.user)) ?? null),
   };
+}
+
+/** Los niveles se piden aparte: si fallan, el muro se ve igual, sin la etiqueta. */
+async function niveles(): Promise<Niveles> {
+  return nivelesDeAutoras().catch(() => new Map());
 }
 
 /**
@@ -62,7 +104,7 @@ function mapa(fila: any, userId: string): MensajePublico {
 export async function listar(
   userId: string,
   esAdmin: boolean,
-  opciones: { desde?: string; limite?: number } = {},
+  opciones: { desde?: string; antes?: string; limite?: number; tipo?: string } = {},
 ): Promise<{ mensajes: MensajePublico[]; hayMas: boolean }> {
   await requireDb();
 
@@ -70,9 +112,17 @@ export async function listar(
   const query: Record<string, unknown> = {};
   if (!esAdmin) query.hidden = false;
 
+  if (opciones.tipo && (TIPOS_POST as readonly string[]).includes(opciones.tipo)) {
+    query.tipo = opciones.tipo;
+  }
+
   if (opciones.desde) {
     const fecha = new Date(opciones.desde);
     if (!Number.isNaN(fecha.getTime())) query.createdAt = { $gt: fecha };
+  } else if (opciones.antes) {
+    // "Ver anteriores": la página que viene antes de la más vieja que ya tiene.
+    const fecha = new Date(opciones.antes);
+    if (!Number.isNaN(fecha.getTime())) query.createdAt = { $lt: fecha };
   }
 
   // Se pide uno de más para saber si quedan anteriores, sin contar la colección.
@@ -84,14 +134,26 @@ export async function listar(
   const hayMas = filas.length > limite;
   const pagina = hayMas ? filas.slice(0, limite) : filas;
 
+  const n = await niveles();
   return {
-    mensajes: pagina.reverse().map((f) => mapa(f, userId)),
+    mensajes: pagina.reverse().map((f) => mapa(f, userId, n)),
     hayMas,
   };
 }
 
-export async function publicar(userId: string, texto: string): Promise<MensajePublico> {
+export async function publicar(
+  userId: string,
+  input: { body: string; tipo?: string; imagen?: string | null },
+): Promise<MensajePublico> {
   await requireDb();
+
+  const texto = input.body;
+  const tipo: TipoPost = (TIPOS_POST as readonly string[]).includes(input.tipo ?? "")
+    ? (input.tipo as TipoPost)
+    : "general";
+  // Solo una foto subida a su carpeta y con su id: no se acepta cualquier public_id.
+  const imagen =
+    input.imagen && input.imagen.startsWith(`metodosk/comunidad/${userId}-`) ? input.imagen : null;
 
   const body = (texto || "").trim();
   if (!body) throw new CustomError("Escribe tu mensaje", 400);
@@ -109,9 +171,12 @@ export async function publicar(userId: string, texto: string): Promise<MensajePu
     authorAvatar: user.avatarPublicId ?? null,
     body,
     fromStaff: esStaff,
+    tipo,
+    imagen,
   });
 
-  return mapa(creado.toObject(), userId);
+  invalidarPuntos();
+  return mapa(creado.toObject(), userId, await niveles());
 }
 
 /**
@@ -129,8 +194,40 @@ export async function borrar(userId: string, esAdmin: boolean, id: string) {
     throw new CustomError("Ese mensaje no es tuyo", 403);
   }
 
+  const imagen = post.imagen;
   await post.deleteOne();
+  if (imagen) await borrarImagen(imagen, "upload").catch(() => undefined);
+  invalidarPuntos();
   return { ok: true };
+}
+
+/**
+ * Reaccionar a una publicación: 💪 fuerza, 🔥 fuego, 👏 aplauso.
+ *
+ * Una de cada tipo por alumna; tocarla otra vez la quita. Es la forma más
+ * barata de responder a un logro, y la que más hace que vuelva a publicar.
+ */
+export async function reaccionar(userId: string, id: string, tipo: string) {
+  await requireDb();
+  if (!(TIPOS_REACCION as readonly string[]).includes(tipo)) {
+    throw new CustomError("Esa reacción no existe", 400);
+  }
+
+  const post = await CommunityPost.findById(id);
+  if (!post || post.hidden) throw new CustomError("Publicación no encontrada", 404);
+
+  const ya = post.reacciones.findIndex((r) => String(r.user) === userId && r.tipo === tipo);
+  if (ya >= 0) post.reacciones.splice(ya, 1);
+  else post.reacciones.push({ user: new Types.ObjectId(userId), tipo: tipo as TipoReaccion, createdAt: new Date() });
+  await post.save();
+
+  invalidarPuntos();
+  return mapa(post.toObject(), userId, await niveles());
+}
+
+/** Firma la subida de la foto de una publicación. La imagen no pasa por acá. */
+export function firmarImagen(userId: string) {
+  return firmarSubidaPost(userId);
 }
 
 /* ─────────────── Foto de perfil ─────────────── */

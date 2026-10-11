@@ -13,6 +13,20 @@ import { Schema, model, Document, Types } from "mongoose";
  * referencia a la cuenta: si mañana cambia su foto, los mensajes de hace un
  * mes no se reescriben solos.
  */
+/** De qué va: se filtra por esto y se pinta con su color. */
+export const TIPOS_POST = ["logro", "pregunta", "motivacion", "receta", "general"] as const;
+export type TipoPost = (typeof TIPOS_POST)[number];
+
+export const TIPOS_REACCION = ["fuerza", "fuego", "aplauso"] as const;
+export type TipoReaccion = (typeof TIPOS_REACCION)[number];
+
+export interface IReaccion {
+  user: Types.ObjectId;
+  tipo: TipoReaccion;
+  /** Cuándo: los puntos por reacción recibida se cuentan por día. */
+  createdAt: Date;
+}
+
 export interface ICommunityPost extends Document {
   user: Types.ObjectId;
   authorName: string;
@@ -23,6 +37,11 @@ export interface ICommunityPost extends Document {
   fromStaff: boolean;
   /** Oculto por la administración. No se borra: se deja de mostrar. */
   hidden: boolean;
+  tipo: TipoPost;
+  /** Foto del logro (public_id de Cloudinary). Opcional. */
+  imagen: string | null;
+  /** Una por alumna y tipo: tocar otra vez la quita. */
+  reacciones: IReaccion[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,6 +54,19 @@ const communityPostSchema = new Schema<ICommunityPost>(
     body: { type: String, required: true, maxlength: 1000 },
     fromStaff: { type: Boolean, default: false },
     hidden: { type: Boolean, default: false },
+    tipo: { type: String, enum: TIPOS_POST, default: "general", index: true },
+    imagen: { type: String, default: null },
+    reacciones: {
+      type: [
+        {
+          _id: false,
+          user: { type: Schema.Types.ObjectId, ref: "User", required: true },
+          tipo: { type: String, enum: TIPOS_REACCION, required: true },
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true },
 );

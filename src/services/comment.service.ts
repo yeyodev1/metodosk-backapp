@@ -1,4 +1,5 @@
 import { Comment, MAX_LARGO } from "../models/Comment";
+import { invalidarPuntos } from "./puntos.service";
 import { User } from "../models/User";
 import { CustomError } from "../errors/customError.error";
 import { dbConnect, isConnected } from "../config/mongo";
@@ -94,6 +95,7 @@ export async function crear(
     fromStaff: user.role === "admin",
     parent: input.parent || null,
   });
+  invalidarPuntos();
 
   return {
     id: String(creado._id),

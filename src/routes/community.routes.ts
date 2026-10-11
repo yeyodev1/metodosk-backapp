@@ -12,9 +12,12 @@ router.get("/avatar", communityController.miAvatar);
 router.post("/avatar/firma", communityController.firmarAvatar);
 router.post("/avatar", communityController.guardarAvatar);
 router.delete("/avatar", communityController.quitarAvatar);
+router.get("/puntos", communityController.puntos);
+router.post("/imagen/firma", communityController.firmarImagen);
 
 router.get("/", communityController.listar);
 router.post("/", communityController.publicar);
 router.delete("/:id", communityController.borrar);
+router.post("/:id/reaccion", communityController.reaccionar);
 
 export default router;
