@@ -3,7 +3,8 @@ import dotenv from "dotenv";
 // En local las variables viven en .env.local (lo escribe Vercel CLI).
 dotenv.config({ path: [".env.local", ".env"] });
 
-import { createReadStream, existsSync, readFileSync, statSync, writeFileSync } from "fs";
+import { spawn } from "child_process";
+import { existsSync, readFileSync, statSync, writeFileSync } from "fs";
 import { basename } from "path";
 import { requireBunny } from "../services/bunny.service";
 
@@ -40,34 +41,31 @@ async function crearVideo(titulo: string): Promise<string> {
   return ((await r.json()) as { guid: string }).guid;
 }
 
+/**
+ * La subida en sí va con curl y no con fetch: con fetch el archivo salía
+ * entero y la conexión se cortaba esperando la respuesta de Bunny, que tarda
+ * en contestar después de recibir varios GB. curl no tiene ese límite.
+ */
 async function subirArchivo(guid: string, archivo: string): Promise<void> {
   const { apiKey, libraryId } = requireBunny();
-  const tamano = statSync(archivo).size;
-  let enviados = 0;
-  let ultimo = 0;
-
-  const flujo = createReadStream(archivo, { highWaterMark: 8 * 1024 * 1024 });
-  flujo.on("data", (trozo) => {
-    enviados += trozo.length;
-    const pct = Math.floor((enviados / tamano) * 100);
-    if (pct >= ultimo + 10) {
-      ultimo = pct - (pct % 10);
-      console.log(`   ${basename(archivo)}: ${ultimo}%`);
-    }
+  const codigo = await new Promise<string>((resolve, reject) => {
+    const curl = spawn("curl", [
+      "-sS",
+      "-X", "PUT",
+      "-H", `AccessKey: ${apiKey}`,
+      "-H", "Content-Type: application/octet-stream",
+      "-T", archivo,
+      "-o", "/dev/null",
+      "-w", "%{http_code}",
+      `${API}/library/${libraryId}/videos/${guid}`,
+    ]);
+    let salida = "";
+    curl.stdout.on("data", (d) => (salida += d));
+    curl.stderr.on("data", (d) => process.stderr.write(d));
+    curl.on("error", reject);
+    curl.on("close", () => resolve(salida.trim()));
   });
-
-  const r = await fetch(`${API}/library/${libraryId}/videos/${guid}`, {
-    method: "PUT",
-    headers: {
-      AccessKey: apiKey,
-      "Content-Type": "application/octet-stream",
-      "Content-Length": String(tamano),
-    },
-    body: flujo as unknown as BodyInit,
-    // Node exige decirlo para mandar un cuerpo en streaming.
-    duplex: "half",
-  } as RequestInit);
-  if (!r.ok) throw new Error(`Bunny rechazó ${basename(archivo)}: ${r.status} ${await r.text()}`);
+  if (!codigo.startsWith("2")) throw new Error(`Bunny rechazó ${basename(archivo)}: HTTP ${codigo}`);
 }
 
 async function main() {
