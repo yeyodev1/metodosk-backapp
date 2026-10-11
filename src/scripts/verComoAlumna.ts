@@ -6,6 +6,7 @@ dotenv.config({ path: [".env.local", ".env"] });
 import mongoose from "mongoose";
 import { dbConnect } from "../config/mongo";
 import { listarParaAlumna } from "../services/course.service";
+import { bloqueAbierto, semanaDelReto } from "../config/bloques";
 import { User } from "../models/User";
 
 /**
@@ -34,11 +35,10 @@ async function main() {
   console.log(`  acceso hasta: ${user.accessUntil?.toISOString().slice(0, 10) ?? "—"}`);
   console.log(`  último ingreso: ${user.lastLoginAt?.toISOString().slice(0, 16) ?? "NUNCA"}`);
 
-  // El mes que la app pide según la semana en que va; 1 mientras esté en el
-  // primer mes, que es donde está todo el mundo ahora.
-  for (const mes of [1]) {
-    const cursos = await listarParaAlumna(String(user._id), mes);
-    console.log(`\n  esto es lo que ve (mes ${mes}):`);
+  // El bloque lo decide el servidor desde su compra (config/bloques.ts).
+  {
+    const cursos = await listarParaAlumna(String(user._id));
+    console.log(`\n  esto es lo que ve (semana ${semanaDelReto(user.accessUntil)}, bloque ${bloqueAbierto(user)}):`);
     for (const c of cursos) {
       const clases = c.lessons.filter((l) => l.embedUrl).length;
       const video = c.welcomeVideo ? "video de bienvenida" : "";

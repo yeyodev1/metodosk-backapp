@@ -21,7 +21,7 @@ import { estadoVideo } from "../services/bunny.service";
  * entrenamiento contrario al que compró.
  *
  * Es idempotente: las clases se buscan por título, así que correrlo otra vez
- * cuando lleguen miércoles y jueves no duplica lo que ya está.
+ * cuando llegue un bloque nuevo no duplica lo que ya está.
  *
  *   npm run montar-entrenamiento -- /ruta/entrenamiento-bunny.json
  */
@@ -31,12 +31,22 @@ interface VideoSubido {
   segundos: number;
 }
 
-/** Qué día va en qué curso. La clave es la del JSON de subida. */
+/**
+ * Qué día va en qué curso. La clave es la del JSON de subida.
+ *
+ * Cada bloque es su propio curso y no más clases en el mismo: el bloque se
+ * abre entero en su semana (el 2 en la semana 5, contada desde la compra; ver
+ * `config/bloques.ts`) y lo que se abre o se cierra es el curso.
+ *
+ * En el bloque 2 llegó un solo martes y un solo jueves, sin apellido de reto
+ * —los dos son de tren superior—, así que van iguales en los dos cursos.
+ */
 const PLAN: Array<{
   slug: string;
   challenge: "recomposicion" | "volumen";
   reto: string;
   foto: string;
+  bloque: number;
   /**
    * `pendiente` es un día que existe en la semana pero todavía no tiene video:
    * se muestra en gris, en su lugar, para que la alumna vea la semana completa
@@ -50,6 +60,7 @@ const PLAN: Array<{
     challenge: "recomposicion",
     reto: "SK Recomposición",
     foto: "metodosk/sk-08",
+    bloque: 1,
     dias: [
       { clave: "lunes-bloque-1", titulo: "Lunes · Bloque 1", resumen: "El primero de la semana. Sigue el video de principio a fin." },
       { clave: "martes-bloque-1-recomposicion", titulo: "Martes · Bloque 1", resumen: "Tu segundo día. Es el de recomposición: no es el mismo que el de volumen." },
@@ -63,6 +74,7 @@ const PLAN: Array<{
     challenge: "volumen",
     reto: "SK Volumen",
     foto: "metodosk/sk-08",
+    bloque: 1,
     dias: [
       { clave: "lunes-bloque-1", titulo: "Lunes · Bloque 1", resumen: "El primero de la semana. Sigue el video de principio a fin." },
       { clave: "martes-bloque-1-volumen", titulo: "Martes · Bloque 1", resumen: "Tu segundo día. Es el de volumen: no es el mismo que el de recomposición." },
@@ -71,6 +83,20 @@ const PLAN: Array<{
       { clave: "viernes-bloque-1", titulo: "Viernes · Bloque 1", resumen: "Cierra la semana." },
     ],
   },
+  ...(["recomposicion", "volumen"] as const).map((challenge) => ({
+    slug: `entrenamiento-bloque-2-${challenge}`,
+    challenge,
+    reto: challenge === "recomposicion" ? "SK Recomposición" : "SK Volumen",
+    foto: "metodosk/sk-08",
+    bloque: 2,
+    dias: [
+      { clave: "lunes-bloque-2", titulo: "Lunes · Bloque 2", resumen: "Empieza el bloque 2: rutinas nuevas para tus semanas 5 a 8." },
+      { clave: "martes-bloque-2", titulo: "Martes · Bloque 2", resumen: "Tren superior. Arranca con abdominales para entrar en calor." },
+      { clave: "miercoles-bloque-2", titulo: "Miércoles · Bloque 2", resumen: "Tercer día de la semana." },
+      { clave: "jueves-bloque-2", titulo: "Jueves · Bloque 2", resumen: "Tren superior. Arranca con abdominales: conecta con tu core." },
+      { clave: "viernes-bloque-2", titulo: "Viernes · Bloque 2", resumen: "Cierra la semana." },
+    ],
+  })),
 ];
 
 async function videoDe(subido: VideoSubido) {
@@ -94,7 +120,7 @@ async function main() {
 
   const subidos = JSON.parse(readFileSync(ruta, "utf-8")) as Record<string, VideoSubido>;
 
-  for (const { slug, challenge, reto, foto, dias } of PLAN) {
+  for (const { slug, challenge, reto, foto, bloque, dias } of PLAN) {
     // Entra lo que ya tiene video y lo que está anunciado como pendiente.
     const disponibles = dias.filter((d) => d.pendiente || subidos[d.clave]);
     if (!disponibles.length) {
@@ -105,11 +131,17 @@ async function main() {
     const curso =
       (await Course.findOne({ slug })) ?? new Course({ slug, challenge, coverPhoto: foto });
 
-    curso.title = `Tu entrenamiento · ${reto}`;
-    curso.summary = "Tu rutina, día por día. Cada bloque es una sesión completa.";
+    if (bloque === 1) {
+      curso.title = `Tu entrenamiento · ${reto}`;
+      curso.summary = "Tu rutina, día por día. Cada bloque es una sesión completa.";
+    } else {
+      curso.title = `Tu entrenamiento · Bloque ${bloque} · ${reto}`;
+      curso.summary = `Las rutinas de tus semanas ${(bloque - 1) * 4 + 1} a ${bloque * 4}. Se abre en tu semana ${(bloque - 1) * 4 + 1}, contada desde tu compra.`;
+    }
     curso.challenge = challenge;
+    // Mismo lugar en la ruta: el bloque decide cuál va primero.
     curso.order = 3;
-    curso.unlockMonth = 1;
+    curso.unlockMonth = bloque;
     curso.coverPhoto = curso.coverPhoto || foto;
     curso.status = "publicado";
     curso.publicarEl = null;
@@ -155,7 +187,7 @@ async function main() {
   }
 
   console.log("\nLa ruta quedó así:");
-  for (const c of await Course.find({ status: { $ne: "borrador" } }).sort({ order: 1 })) {
+  for (const c of await Course.find({ status: { $ne: "borrador" } }).sort({ order: 1, unlockMonth: 1 })) {
     const videos = (c.welcomeVideo ? 1 : 0) + c.lessons.filter((l) => l.video).length;
     console.log(
       `  ${String(c.order).padStart(2)} ${c.title.padEnd(34)} ${c.challenge.padEnd(14)} ${String(videos).padStart(2)} video(s)`,

@@ -3,6 +3,7 @@ import { Guia as GuiaModel } from "../models/Guia";
 import { CustomError } from "../errors/customError.error";
 import { User } from "../models/User";
 import { dbConnect, isConnected } from "../config/mongo";
+import { bloqueAbierto } from "../config/bloques";
 
 /**
  * Qué guía le toca a cada alumna.
@@ -39,7 +40,18 @@ export async function guiasDeAlumna(userId: string): Promise<Guia[]> {
   if (!user) throw new CustomError("Cuenta no encontrada", 404);
 
   const guardadas = await GuiaModel.find().lean();
-  const porAudiencia = new Map(guardadas.map((g) => [g.audiencia, g.contenido as Guia]));
+  // Los menús de los meses siguientes salen solo si ya le tocan: el del mes 2
+  // en su semana 5, contada desde su compra.
+  const bloque = bloqueAbierto(user);
+  const porAudiencia = new Map<string, Guia>(
+    guardadas.map((g): [string, Guia] => {
+      const guia = g.contenido as Guia;
+      return [
+        g.audiencia,
+        { ...guia, menus: (guia.menus ?? []).filter((m) => m.mes <= bloque) },
+      ];
+    }),
+  );
 
   // La administración ve las dos: son las dueñas del material.
   if (user.role === "admin") return [...porAudiencia.values()];

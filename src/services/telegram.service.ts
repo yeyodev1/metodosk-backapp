@@ -33,7 +33,7 @@ import {
 
 const API = "https://api.telegram.org";
 
-async function telegramFetch(metodo: string, body: Record<string, unknown>): Promise<any> {
+export async function telegramFetch(metodo: string, body: Record<string, unknown>): Promise<any> {
   const token = telegramToken();
   if (!token) throw new CustomError("Falta configurar TELEGRAM_BOT_TOKEN.", 503);
 

@@ -4,11 +4,14 @@ import { CustomError } from "../errors/customError.error";
 import { bunnyConfig } from "../services/bunny.service";
 import * as courseService from "../services/course.service";
 
-/** GET /api/courses — la ruta de la alumna, según su reto y el mes en que va. */
+/**
+ * GET /api/courses — la ruta de la alumna, según su reto y el bloque en que va.
+ *
+ * El `?mes=` que manda la app ya no se lee: el bloque sale de su compra.
+ */
 export async function misCursos(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const mes = Math.min(Math.max(Number(req.query.mes) || 1, 1), 3);
-    const cursos = await courseService.listarParaAlumna(req.user!.userId, mes);
+    const cursos = await courseService.listarParaAlumna(req.user!.userId);
     res.status(200).json({ cursos });
   } catch (error) {
     next(error);

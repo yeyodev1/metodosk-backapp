@@ -64,5 +64,28 @@ export interface Guia {
   }>;
   /** El recetario en video, que las comidas citan todo el tiempo. */
   recetario: string;
+  /**
+   * Los menús de los bloques siguientes: el del mes 2, el del mes 3.
+   *
+   * Karen entrega cada mes un menú nuevo con sus propias porciones de
+   * intercambio; lo demás (snacks, condimentos, compras, suplementos) sigue
+   * siendo el de la guía. El de arriba es el menú del mes 1 y no se reemplaza:
+   * la que todavía no llega al mes 2 lo sigue necesitando.
+   *
+   * El API manda solo los que la alumna ya tiene abiertos.
+   */
+  menus?: MenuGuia[];
+}
+
+export interface MenuGuia {
+  /** El bloque al que pertenece: 2 o 3. Se abre en la semana (mes - 1) * 4 + 1. */
+  mes: number;
+  titulo: string;
+  comoUsar: string[];
+  diasDePierna: number[];
+  dias: DiaGuia[];
+  /** Las tablas de intercambio de este menú: las porciones cambian de mes a mes. */
+  tablas: TablaGuia[];
+  recetario: string;
 }
 

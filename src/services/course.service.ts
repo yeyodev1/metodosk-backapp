@@ -3,6 +3,7 @@ import { User } from "../models/User";
 import { Progress } from "../models/Progress";
 import { CustomError } from "../errors/customError.error";
 import { dbConnect, isConnected } from "../config/mongo";
+import { abreElBloque, bloqueAbierto } from "../config/bloques";
 import {
   bunnyConfig,
   crearSubida,
@@ -172,17 +173,17 @@ export interface CursoParaAlumna {
 /**
  * La ruta que le toca a esta alumna.
  *
- * Se filtra por su reto y por el mes en que va: mandarle el mes 3 en la
- * semana 2 no la adelanta, la abruma.
+ * Se filtra por su reto y por el bloque en que va: mandarle el mes 3 en la
+ * semana 2 no la adelanta, la abruma. El bloque lo calcula el servidor desde
+ * su compra (ver `config/bloques.ts`), no lo dice la app.
  */
-export async function listarParaAlumna(
-  userId: string,
-  mesActual: number,
-): Promise<CursoParaAlumna[]> {
+export async function listarParaAlumna(userId: string): Promise<CursoParaAlumna[]> {
   await requireDb();
 
   const user = await User.findById(userId);
   if (!user) throw new CustomError("Cuenta no encontrada", 404);
+
+  const mesActual = bloqueAbierto(user);
 
   // La administración ve el material de los dos retos: es suyo. Sin esto,
   // revisar la app "como alumna" escondía la mitad del método.
@@ -190,7 +191,8 @@ export async function listarParaAlumna(
   const query: Record<string, unknown> = { status: { $in: ["publicado", "proximamente"] } };
   if (audiencias.length) query.challenge = { $in: [...audiencias, "ambas"] };
 
-  const cursos = await Course.find(query).sort({ order: 1 }).lean();
+  // A igual orden, el bloque: el entrenamiento del bloque 2 va después del 1.
+  const cursos = await Course.find(query).sort({ order: 1, unlockMonth: 1 }).lean();
   const hayBunny = Boolean(bunnyConfig());
 
   // El avance se trae de una vez y no por curso: son doce cursos, no doce
@@ -232,8 +234,13 @@ export async function listarParaAlumna(
       coverPhoto: curso.coverPhoto,
       challenge: curso.challenge,
       estado,
+      // Cerrado por bloque: la fecha es la de su semana, contada desde su compra.
       abreEl:
-        curso.publicarEl && curso.publicarEl > ahora ? curso.publicarEl.toISOString() : null,
+        curso.publicarEl && curso.publicarEl > ahora
+          ? curso.publicarEl.toISOString()
+          : estado === "cerrado"
+            ? (abreElBloque(user.accessUntil, curso.unlockMonth)?.toISOString() ?? null)
+            : null,
       notas: abierto ? (curso.notas ?? []) : [],
       enlace: curso.enlace ?? null,
       welcomeVideo:
