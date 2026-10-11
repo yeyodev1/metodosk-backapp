@@ -87,5 +87,7 @@ export interface MenuGuia {
   /** Las tablas de intercambio de este menú: las porciones cambian de mes a mes. */
   tablas: TablaGuia[];
   recetario: string;
+  /** Las categorías que se suman a la lista de compras con este menú. */
+  compras?: Array<{ titulo: string; imagenes: string[] }>;
 }
 
