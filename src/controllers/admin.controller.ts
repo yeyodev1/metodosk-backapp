@@ -144,6 +144,8 @@ export async function listOrders(req: AuthRequest, res: Response, next: NextFunc
         phoneNumber: o.phoneNumber ?? null,
         // Las compras viejas se guardaron sin reto: se deduce del id.
         challenge: resolverChallenge(o.challenge, o.clientTransactionId),
+        couponCode: o.couponCode ?? null,
+        discountPercent: o.discountPercent ?? null,
         accessMonths: o.accessMonths ?? null,
         accessUntil: o.accessUntil ?? null,
         authorizationCode: o.authorizationCode ?? null,

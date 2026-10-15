@@ -161,7 +161,13 @@ export async function confirmTransaction(
 
   const status = statusFrom(raw);
   const amountCents = Number(raw.amount) || 0;
-  const amountVerified = isKnownAmount(amountCents);
+  /**
+   * Con cupón, el único monto válido es el que el servidor fijó en el intent
+   * antes de salir a PayPhone. Se valida contra ese y no contra el cupón de
+   * hoy: si venció mientras ella pagaba, su compra igual es legítima.
+   */
+  const conCupon = Boolean(guardado?.couponCode && guardado.expectedCents === amountCents);
+  const amountVerified = isKnownAmount(amountCents) || conCupon;
 
   if (status === "approved" && !amountVerified) {
     // El cobro pasó por un monto que no es ninguno de nuestros precios.
@@ -190,6 +196,8 @@ export async function confirmTransaction(
     cardHolder: raw.optionalParameter4 ?? null,
     buyerName: datos.name ?? null,
     challenge,
+    couponCode: conCupon ? guardado!.couponCode : null,
+    discountPercent: conCupon ? guardado!.couponPercent : null,
     accessMonths: ACCESS_MONTHS,
     accessUntil,
     payphoneResponse: raw,

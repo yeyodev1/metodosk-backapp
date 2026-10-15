@@ -6,6 +6,7 @@ import * as courseController from "../controllers/course.controller";
 import * as settingsController from "../controllers/settings.controller";
 import * as commentController from "../controllers/comment.controller";
 import * as avancesController from "../controllers/avances.controller";
+import * as couponController from "../controllers/coupon.controller";
 
 const router = Router();
 
@@ -32,6 +33,12 @@ router.post("/acceso-exclusivo", adminController.accesoExclusivo);
 router.get("/novedad", adminController.verNovedad);
 router.post("/novedad", adminController.escribirNovedad);
 router.post("/novedad/avisar", adminController.avisarNovedad);
+
+// Cupones de descuento: porcentaje, vigencia y link listo para compartir.
+router.get("/cupones", couponController.listar);
+router.post("/cupones", couponController.crear);
+router.patch("/cupones/:id", couponController.editar);
+router.delete("/cupones/:id", couponController.eliminar);
 
 // Cursos: la ruta del método y sus videos.
 router.get("/courses", courseController.listar);

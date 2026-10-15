@@ -23,6 +23,9 @@ export interface IOrder extends Document {
   buyerName: string | null;
   /** Reto elegido, p. ej. "SK Recomposición". */
   challenge: string | null;
+  /** Cupón con el que se compró (tal como se escribió al crearlo). */
+  couponCode: string | null;
+  discountPercent: number | null;
   accessMonths: number;
   accessUntil: Date | null;
   payphoneResponse: unknown;
@@ -49,6 +52,8 @@ const orderSchema = new Schema<IOrder>(
     cardHolder: { type: String, default: null },
     buyerName: { type: String, default: null },
     challenge: { type: String, default: null },
+    couponCode: { type: String, default: null },
+    discountPercent: { type: Number, default: null },
     accessMonths: { type: Number, default: 3 },
     accessUntil: { type: Date, default: null },
     payphoneResponse: { type: Schema.Types.Mixed, default: null },

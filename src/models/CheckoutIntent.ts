@@ -21,6 +21,13 @@ export interface ICheckoutIntent extends Document {
   email: string | null;
   phone: string | null;
   challenge: string | null;
+  /**
+   * Cupón aplicado y el monto que el servidor calculó con él. Al confirmar,
+   * PayPhone tiene que haber cobrado exactamente `expectedCents`.
+   */
+  couponCode: string | null;
+  couponPercent: number | null;
+  expectedCents: number | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,6 +39,9 @@ const checkoutIntentSchema = new Schema<ICheckoutIntent>(
     email: { type: String, default: null },
     phone: { type: String, default: null },
     challenge: { type: String, default: null },
+    couponCode: { type: String, default: null },
+    couponPercent: { type: Number, default: null },
+    expectedCents: { type: Number, default: null },
   },
   { timestamps: true },
 );

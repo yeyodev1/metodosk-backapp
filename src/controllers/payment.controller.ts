@@ -12,6 +12,7 @@ import {
 } from "../services/payphone.service";
 import { pricingStatus, presaleDeadline } from "../config/pricing";
 import { beneficiosDe } from "../config/perks";
+import { cuponParaCobro } from "../services/coupon.service";
 
 /**
  * El Origin real de la petición manda: así nadie puede forzar credenciales
@@ -184,7 +185,10 @@ export async function beneficios(req: AuthRequest, res: Response, next: NextFunc
 /**
  * POST /api/payments/intent — guarda el contacto antes de salir a PayPhone.
  *
- * body: { clientTransactionId, name?, email?, phone?, challenge? }
+ * body: { clientTransactionId, name?, email?, phone?, challenge?, coupon? }
+ *
+ * Si trae cupón, acá se valida y se fija el monto a cobrar. La respuesta lo
+ * devuelve y el checkout cobra ESE monto, no uno calculado en el navegador.
  *
  * Es lo que hace que las credenciales lleguen al correo que la compradora
  * escribió y no al que PayPhone tenga asociado a su tarjeta. Ver el comentario
@@ -196,15 +200,16 @@ export async function beneficios(req: AuthRequest, res: Response, next: NextFunc
  */
 export async function guardarIntent(req: Request, res: Response, next: NextFunction) {
   try {
-    const { clientTransactionId, name, email, phone, challenge } = req.body ?? {};
+    const { clientTransactionId, name, email, phone, challenge, coupon } = req.body ?? {};
     if (!clientTransactionId) {
       throw new CustomError("Falta clientTransactionId", 400);
     }
 
     if (!isConnected() && !(await dbConnect())) {
-      return res.status(200).json({ guardado: false });
+      return res.status(200).json({ guardado: false, cupon: null });
     }
 
+    const cupon = await cuponParaCobro(coupon);
     const texto = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
     await CheckoutIntent.findOneAndUpdate(
@@ -215,15 +220,23 @@ export async function guardarIntent(req: Request, res: Response, next: NextFunct
         email: texto(email)?.toLowerCase() ?? null,
         phone: texto(phone),
         challenge: texto(challenge),
+        couponCode: cupon?.code ?? null,
+        couponPercent: cupon?.percent ?? null,
+        expectedCents: cupon?.finalCents ?? null,
       },
       { upsert: true, new: true, setDefaultsOnInsert: true },
     );
 
-    res.status(200).json({ guardado: true });
+    res.status(200).json({
+      guardado: true,
+      cupon: cupon
+        ? { code: cupon.code, percent: cupon.percent, finalCents: cupon.finalCents, baseCents: cupon.baseCents }
+        : null,
+    });
   } catch (error) {
     // Un fallo acá no puede impedir que alguien compre.
     if (error instanceof CustomError && error.status === 400) return next(error);
     console.error("[payments] no se pudo guardar el intent:", error);
-    res.status(200).json({ guardado: false });
+    res.status(200).json({ guardado: false, cupon: null });
   }
 }
