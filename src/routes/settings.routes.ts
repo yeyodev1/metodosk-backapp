@@ -6,5 +6,6 @@ const router = Router();
 // Sin sesión a propósito: el VSL se reproduce justo después de pagar, cuando
 // todavía no hay cuenta con la que iniciar sesión.
 router.get("/vsl", settingsController.vsl);
+router.get("/web", settingsController.web);
 
 export default router;

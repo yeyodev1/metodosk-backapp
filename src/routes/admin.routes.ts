@@ -57,6 +57,10 @@ router.post("/vsl/video", settingsController.prepararVsl);
 router.get("/vsl/estado", settingsController.refrescarVsl);
 router.delete("/vsl", settingsController.borrarVsl);
 
+// Zona peligrosa: apaga la landing y deja "regresa pronto". La app sigue viva.
+router.get("/web", settingsController.web);
+router.put("/web", settingsController.cambiarWeb);
+
 // Las fotos de avance de cada alumna y los comentarios del equipo sobre ellas.
 router.get("/avances", avancesController.listar);
 router.get("/avances/:id", avancesController.ficha);

@@ -26,6 +26,9 @@ export const Setting = model<ISetting>("Setting", settingSchema);
 /** El video que ve quien acaba de comprar. */
 export const CLAVE_VSL = "vsl";
 
+/** La landing apagada: el home muestra "regresa pronto" en vez de la venta. */
+export const CLAVE_WEB_APAGADA = "web_apagada";
+
 export interface VslGuardado {
   bunnyId: string;
   status: "subiendo" | "procesando" | "listo" | "error";

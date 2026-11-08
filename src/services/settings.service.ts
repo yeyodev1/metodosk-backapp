@@ -1,4 +1,4 @@
-import { Setting, CLAVE_VSL, type VslGuardado } from "../models/Setting";
+import { Setting, CLAVE_VSL, CLAVE_WEB_APAGADA, type VslGuardado } from "../models/Setting";
 import { CustomError } from "../errors/customError.error";
 import { dbConnect, isConnected } from "../config/mongo";
 import { bunnyConfig, crearSubida, estadoVideo, borrarVideo, urlEmbed } from "./bunny.service";
@@ -100,4 +100,31 @@ export async function borrarVsl() {
   if (vsl?.bunnyId) await borrarVideo(vsl.bunnyId).catch(() => undefined);
   await Setting.deleteOne({ key: CLAVE_VSL });
   return { ok: true };
+}
+
+/* ─────────────── Web apagada ─────────────── */
+
+/**
+ * Público y sin fallar: si la base no responde, la landing se muestra. Es
+ * preferible vender con el aviso caído que cerrar la web por un error nuestro.
+ */
+export async function webApagada(): Promise<boolean> {
+  if (!isConnected() && !(await dbConnect())) return false;
+  try {
+    const guardado = await Setting.findOne({ key: CLAVE_WEB_APAGADA }).lean();
+    return guardado?.value === true;
+  } catch (error) {
+    console.error("[web] no se pudo leer:", error);
+    return false;
+  }
+}
+
+export async function cambiarWeb(apagada: boolean) {
+  await requireDb();
+  await Setting.findOneAndUpdate(
+    { key: CLAVE_WEB_APAGADA },
+    { key: CLAVE_WEB_APAGADA, value: apagada },
+    { upsert: true },
+  );
+  return { apagada };
 }

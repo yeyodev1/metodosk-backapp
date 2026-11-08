@@ -44,3 +44,22 @@ export async function borrarVsl(_req: AuthRequest, res: Response, next: NextFunc
     next(error);
   }
 }
+
+/** GET /api/settings/web — público: la landing pregunta si está apagada. */
+export async function web(_req: Request, res: Response, next: NextFunction) {
+  try {
+    res.status(200).json({ apagada: await settingsService.webApagada() });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function cambiarWeb(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { apagada } = req.body as { apagada?: unknown };
+    if (typeof apagada !== "boolean") throw new CustomError("Falta indicar si se apaga o se enciende", 400);
+    res.status(200).json(await settingsService.cambiarWeb(apagada));
+  } catch (error) {
+    next(error);
+  }
+}
