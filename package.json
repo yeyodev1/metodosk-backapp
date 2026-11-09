@@ -24,6 +24,7 @@
     "ver-como-alumna": "ts-node-dev --transpile-only src/scripts/verComoAlumna.ts",
     "novedad-tienda": "ts-node-dev --transpile-only src/scripts/novedadTienda.ts",
     "novedad-bloque-2": "ts-node-dev --transpile-only src/scripts/novedadBloque2.ts",
+    "novedad-bloque-3": "ts-node-dev --transpile-only src/scripts/novedadBloque3.ts",
     "subir-videos": "ts-node-dev --transpile-only src/scripts/subirVideos.ts"
   },
   "dependencies": {
