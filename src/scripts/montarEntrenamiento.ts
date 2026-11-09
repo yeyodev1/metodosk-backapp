@@ -97,6 +97,21 @@ const PLAN: Array<{
       { clave: "viernes-bloque-2", titulo: "Viernes · Bloque 2", resumen: "Cierra la semana." },
     ],
   })),
+  // Bloque 3: llegaron lunes y martes primero; el resto de la semana queda en gris.
+  ...(["recomposicion", "volumen"] as const).map((challenge) => ({
+    slug: `entrenamiento-bloque-3-${challenge}`,
+    challenge,
+    reto: challenge === "recomposicion" ? "SK Recomposición" : "SK Volumen",
+    foto: "metodosk/sk-08",
+    bloque: 3,
+    dias: [
+      { clave: "lunes-bloque-3", titulo: "Lunes · Bloque 3", resumen: "Empieza el bloque 3: rutinas nuevas para tus semanas 9 a 12." },
+      { clave: "martes-bloque-3", titulo: "Martes · Bloque 3", resumen: "Tu segundo día de la semana." },
+      { clave: "miercoles-bloque-3", titulo: "Miércoles · Bloque 3", resumen: "Tercer día de la semana.", pendiente: true },
+      { clave: "jueves-bloque-3", titulo: "Jueves · Bloque 3", resumen: "Cuarto día de la semana.", pendiente: true },
+      { clave: "viernes-bloque-3", titulo: "Viernes · Bloque 3", resumen: "Cierra la semana.", pendiente: true },
+    ],
+  })),
 ];
 
 async function videoDe(subido: VideoSubido) {
